@@ -20,6 +20,20 @@ function art(seed, w, h, title) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 const posterArt = (seed, title) => art(seed, 300, 450, title);
+// Stand-ins for TMDB title logos and iptv-org channel logos (demo only).
+function titleLogo(title) {
+  const t = esc(String(title).replace(/\s*\(\d{4}\)$/, '').toUpperCase());
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260"><text x="0" y="170" font-family="Georgia,serif" font-weight="700" font-size="120" letter-spacing="6" fill="#f5f5f5"${t.length > 11 ? ' textLength="890" lengthAdjust="spacingAndGlyphs"' : ''}>${t}</text><rect x="4" y="205" width="300" height="10" fill="#f59e0b"/></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+const LOGO_COLORS = ['#e11d48', '#2563eb', '#059669', '#d97706', '#7c3aed', '#0891b2', '#dc2626', '#4f46e5'];
+function channelLogo(i, name) {
+  const words = String(name).split(' ');
+  const mark = esc(words.map((w) => w[0]).join('').slice(0, 3));
+  const c = LOGO_COLORS[i % LOGO_COLORS.length];
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect x="20" y="30" width="120" height="120" rx="26" fill="${c}"/><text x="80" y="110" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="52" fill="#fff">${mark}</text><text x="156" y="84" font-family="Arial,sans-serif" font-weight="800" font-size="38" fill="#f5f5f5">${esc(words[0] || '')}</text><text x="156" y="126" font-family="Arial,sans-serif" font-weight="600" font-size="30" fill="#a3a3a3">${esc(words.slice(1).join(' '))}</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 const backdropArt = (seed) => art(seed + 3, 1600, 900, '');
 
 function makeCatalog() {
@@ -61,6 +75,7 @@ function makeCatalog() {
     year: String(2000 + (i % 26)),
   }));
   vod.forEach((m, i) => (m.icon = posterArt(i, m.name)));
+  live.forEach((c, i) => i < 2000 && (c.icon = channelLogo(i, c.name)));
   series.forEach((m, i) => (m.icon = posterArt(i + 11, m.name)));
   return {
     live: { categories: liveCats, items: live },
@@ -185,7 +200,7 @@ export function createMockApi() {
       };
     },
     'cache:clear': () => (catalog = null),
-    'art:get': () => null,
+    'art:get': (q) => (settings.tmdbKey ? { poster: null, backdrop: backdropArt(q.id), logo: titleLogo(q.name), overview: null } : null),
     'art:testKey': async (key) => {
       await wait(300);
       if (!key || key.length < 20) throw new Error('TMDB rejected the API key');
@@ -213,7 +228,7 @@ export function createMockApi() {
   if (typeof location !== 'undefined' && location.hash.startsWith('#osd')) {
     const kind = location.hash.includes('vod') ? 'movie' : 'live';
     const names = ['Nova Sport HD', 'Metro News', 'Planet Wild 4K', 'Retro Gold', 'Sky Arena', 'Ocean One', 'Prime Cinema HD', 'Kids Club', 'Echo Music', 'Royal Docs'];
-    const items = Array.from({ length: 50 }, (_, i) => ({ kind: 'live', id: 1001 + i, num: 101 + i, name: `${names[i % names.length]}${i >= 10 ? ` ${Math.floor(i / 10) + 1}` : ''}`, epg: `ch${i + 1}`, icon: '' }));
+    const items = Array.from({ length: 50 }, (_, i) => { const name = `${names[i % names.length]}${i >= 10 ? ` ${Math.floor(i / 10) + 1}` : ''}`; return { kind: 'live', id: 1001 + i, num: 101 + i, name, epg: `ch${i + 1}`, icon: channelLogo(i, name) }; });
     osdDemo = { items, index: 0, jump(i) { this.index = (i + items.length) % items.length; } };
     const episode = { kind: 'episode', id: 9, name: 'Episode 3', seriesName: 'Metro Chronicles', season: 1, episode: 3, icon: '' };
     let pos = 1234;
