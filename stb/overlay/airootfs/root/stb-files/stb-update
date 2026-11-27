@@ -166,7 +166,10 @@ cmd_wifi() {
         wifi_status "$dev" | jq -e '.state == "connected" and (.ip | length > 0)' >/dev/null && break
         sleep 1
       done
-      if wifi_status "$dev" | jq -e '.state == "connected"' >/dev/null; then wifi_status "$dev"
+      if wifi_status "$dev" | jq -e '.state == "connected"' >/dev/null; then
+        # Saved network should follow the adapter, whatever it is called.
+        nmcli connection modify id "$2" connection.interface-name "" >/dev/null 2>&1 || true
+        wifi_status "$dev"
       else
         nmcli connection delete id "$2" >/dev/null 2>&1 || true
         jq -cn --arg e "${out:-Could not connect. Check the password.}" '{error: ($e | split("\n") | map(select(length > 0)) | last // "Could not connect" | sub("^Error: "; ""))}'

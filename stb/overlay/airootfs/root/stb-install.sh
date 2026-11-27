@@ -271,6 +271,9 @@ install -Dm644 "$FILES/nm-stb.conf" "$MNT/etc/NetworkManager/conf.d/stb.conf"
 mkdir -p "$MNT/etc/NetworkManager/system-connections"
 cp -a /etc/NetworkManager/system-connections/*.nmconnection "$MNT/etc/NetworkManager/system-connections/" 2>/dev/null || true
 chmod 600 "$MNT"/etc/NetworkManager/system-connections/* 2>/dev/null || true
+# The live system calls the adapter wlan0; the installed box uses a predictable
+# name (wlp0s…). Don't tie saved networks to an interface name.
+sed -i '/^interface-name=/d' "$MNT"/etc/NetworkManager/system-connections/*.nmconnection 2>/dev/null || true
 
 # Auto-login on tty1, no login banner.
 install -Dm644 "$FILES/getty-autologin.conf" "$MNT/etc/systemd/system/getty@tty1.service.d/autologin.conf"
