@@ -34,7 +34,7 @@ cp /build/payload/oled-iptv.tar.zst /build/profile/airootfs/opt/stb-payload/
 # packages a Dell OptiPlex needs (saves ~400 MB, keeping the ISO < 2 GB for
 # GitHub releases), and add what the installer uses.
 sed -i '/^linux-firmware/d' /build/profile/packages.x86_64
-for p in arch-install-scripts gptfdisk dosfstools e2fsprogs iwd iw zstd terminus-font \
+for p in arch-install-scripts gptfdisk dosfstools e2fsprogs iwd iw zstd terminus-font networkmanager wpa_supplicant \
          linux-firmware-intel linux-firmware-realtek linux-firmware-atheros linux-firmware-mediatek; do
   grep -qx "$p" /build/profile/packages.x86_64 || echo "$p" >> /build/profile/packages.x86_64
 done

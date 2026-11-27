@@ -129,11 +129,11 @@ export function createMockApi() {
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const wifi = {
-    status: { state: 'disconnected', ssid: '', ip: '', rssi: null },
+    status: { state: 'disconnected', ssid: '', ip: '', signal: null },
     networks: [
-      { ssid: 'Zyxel_D41A', security: 'psk', rssi: -56 },
-      { ssid: 'USNET-S9C923', security: 'psk', rssi: -72 },
-      { ssid: 'Cafe Free WiFi', security: 'open', rssi: -81 },
+      { ssid: 'Zyxel_D41A', security: 'WPA2', signal: 74 },
+      { ssid: 'PLUSNET-S9C923', security: 'WPA1 WPA2', signal: 52 },
+      { ssid: 'Cafe Free WiFi', security: 'open', signal: 31 },
     ],
   };
 
@@ -218,11 +218,11 @@ export function createMockApi() {
       await wait(1800);
       const n = wifi.networks.find((x) => x.ssid === ssid);
       if (n?.security !== 'open' && password !== 'password123') throw new Error('Operation failed');
-      wifi.status = { state: 'connected', ssid, ip: '192.168.1.42', rssi: n?.rssi ?? -60 };
+      wifi.status = { state: 'connected', ssid, ip: '192.168.1.42', signal: n?.signal ?? 60 };
       return { device: 'wlan0', ...wifi.status };
     },
     'net:forget': async () => {
-      wifi.status = { state: 'disconnected', ssid: '', ip: '', rssi: null };
+      wifi.status = { state: 'disconnected', ssid: '', ip: '', signal: null };
       return { device: 'wlan0', ...wifi.status };
     },
     'system:update:check': async () => {

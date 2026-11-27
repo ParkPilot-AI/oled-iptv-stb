@@ -113,61 +113,66 @@ cmd_run() {
 }
 
 # ---------------------------------------------------------------- Wi-Fi
-wifi_dev() { [[ -n ${STB_WIFI_DEV:-} ]] && { echo "$STB_WIFI_DEV"; return; }; for d in /sys/class/net/*; do [[ -d $d/wireless ]] && basename "$d"; done | head -n1; }
-nocolor() { sed 's/\x1b\[[0-9;]*m//g'; }
+# NetworkManager (wpa_supplicant) — works with Realtek USB dongles where iwd can't scan.
+wifi_dev() {
+  [[ -n ${STB_WIFI_DEV:-} ]] && { echo "$STB_WIFI_DEV"; return; }
+  for d in /sys/class/net/*; do [[ -d $d/wireless ]] && basename "$d"; done | head -n1
+}
+
+# nmcli -t escapes ':' inside values as '\:' — split safely in jq.
+NM_SPLIT='gsub("\\\\:"; "\u001f") | split(":") | map(gsub("\u001f"; ":"))'
 
 wifi_status() {
-  local dev=$1 drv
+  local dev=$1 drv state conn ip signal
   drv=$(basename "$(readlink -f "/sys/class/net/$dev/device/driver")" 2>/dev/null)
-  iwctl station "$dev" show 2>/dev/null | nocolor | awk -v dev="$dev" -v drv="$drv" '
-    function trim(x) { sub(/^[ \t]+/, "", x); sub(/[ \t]+$/, "", x); return x }
-    { line = $0; sub(/^[ \t]*\*?[ \t]*/, "", line)
-      n = split(line, f, /  +/)
-      if (n >= 2) v[trim(f[1])] = trim(f[2]) }
-    END {
-      rssi = v["RSSI"]; sub(/ dBm/, "", rssi)
-      printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", dev, drv, v["State"], v["Connected network"], v["IPv4 address"], rssi, v["Scanning"] }' |
-    jq -Rc 'split("\t") | {device: .[0], driver: .[1], state: (.[2] // "unknown"), ssid: (.[3] // ""), ip: (.[4] // ""), rssi: ((.[5] // "") | tonumber? // null), scanning: (.[6] == "yes")}'
+  state=$(nmcli -g GENERAL.STATE dev show "$dev" 2>/dev/null | head -n1)
+  conn=$(nmcli -g GENERAL.CONNECTION dev show "$dev" 2>/dev/null | head -n1)
+  ip=$(nmcli -g IP4.ADDRESS dev show "$dev" 2>/dev/null | head -n1 | cut -d/ -f1)
+  signal=$(nmcli -t -f IN-USE,SIGNAL dev wifi list ifname "$dev" --rescan no 2>/dev/null | awk -F: '$1 == "*" { print $2; exit }')
+  jq -cn --arg dev "$dev" --arg drv "$drv" --arg state "$state" --arg ssid "$conn" --arg ip "$ip" --arg signal "$signal" '
+    {device: $dev, driver: $drv,
+     state: (if ($state | test("^100")) then "connected" elif ($state | test("^(40|50|60|70|80|90)")) then "connecting" else "disconnected" end),
+     ssid: (if ($state | test("^100")) then $ssid else "" end), ip: $ip,
+     signal: ($signal | tonumber? // null), rssi: null, scanning: false}'
 }
 
 wifi_scan() {
   local dev=$1
-  iwctl station "$dev" scan >/dev/null 2>&1
-  for _ in $(seq 1 20); do
-    sleep 1
-    iwctl station "$dev" show 2>/dev/null | nocolor | grep -Eq 'Scanning +no' && break
-  done
-  iwctl station "$dev" get-networks rssi-dbms 2>/dev/null | nocolor | awk '
-    /^-+$/ { dashes++; next }
-    dashes >= 2 && NF {
-      line = $0; connected = (line ~ /^[ \t]*>/)
-      sub(/^[ \t]*>?[ \t]*/, "", line)
-      n = split(line, f, /  +/)
-      if (n >= 3) printf "%s\t%s\t%s\t%d\n", f[1], f[2], f[3], connected }' |
-    jq -Rsc '[split("\n")[] | select(length > 0) | split("\t") |
-      {ssid: .[0], security: .[1], rssi: ((.[2] | tonumber? // 0) | if . < -1000 then . / 100 else . end), connected: (.[3] == "1")}]
-      | sort_by(-.rssi) | unique_by(.ssid) | sort_by(-.rssi)'
+  nmcli dev wifi rescan ifname "$dev" >/dev/null 2>&1
+  sleep "${STB_SCAN_WAIT:-8}"
+  nmcli -t -f IN-USE,SSID,SECURITY,SIGNAL dev wifi list ifname "$dev" --rescan no 2>/dev/null |
+    jq -Rsc "[split(\"\\n\")[] | select(length > 0) | $NM_SPLIT |
+      {ssid: .[1], security: (if (.[2] == \"\" or .[2] == \"--\") then \"open\" else .[2] end),
+       signal: (.[3] | tonumber? // 0), connected: (.[0] == \"*\")}
+      | select(.ssid != \"\" and .ssid != \"--\")]
+      | group_by(.ssid) | map(max_by(.signal) + {connected: (map(.connected) | any)}) | sort_by(-.signal)"
 }
 
 cmd_wifi() {
   local dev; dev=$(wifi_dev)
   if [[ -z $dev ]]; then jq -cn '{error: "No Wi-Fi adapter found. Plug the USB Wi-Fi adapter in and try again."}'; return 1; fi
+  nmcli radio wifi on >/dev/null 2>&1 || true
   case ${1:-} in
     status) wifi_status "$dev" ;;
     scan) jq -cn --argjson networks "$(wifi_scan "$dev")" --argjson status "$(wifi_status "$dev")" '$status + {networks: $networks}' ;;
     connect)
       [[ -n ${2:-} ]] || { jq -cn '{error: "No network name"}'; return 1; }
-      local pass=""; IFS= read -r pass || true
-      local out
-      if [[ -n $pass ]]; then out=$(iwctl --passphrase "$pass" station "$dev" connect "$2" 2>&1 | nocolor)
-      else out=$(iwctl station "$dev" connect "$2" 2>&1 | nocolor); fi
-      for _ in $(seq 1 25); do
+      local pass="" out
+      IFS= read -r pass || true
+      nmcli connection delete id "$2" >/dev/null 2>&1 || true
+      if [[ -n $pass ]]; then out=$(nmcli dev wifi connect "$2" password "$pass" ifname "$dev" 2>&1)
+      else out=$(nmcli dev wifi connect "$2" ifname "$dev" 2>&1); fi
+      for _ in $(seq 1 20); do
         wifi_status "$dev" | jq -e '.state == "connected" and (.ip | length > 0)' >/dev/null && break
         sleep 1
       done
       if wifi_status "$dev" | jq -e '.state == "connected"' >/dev/null; then wifi_status "$dev"
-      else jq -cn --arg e "${out:-Could not connect. Check the password.}" '{error: ($e | split("\n") | map(select(length > 0)) | last // "Could not connect")}'; return 1; fi ;;
-    forget) iwctl known-networks "${2:-}" forget >/dev/null 2>&1; wifi_status "$dev" ;;
+      else
+        nmcli connection delete id "$2" >/dev/null 2>&1 || true
+        jq -cn --arg e "${out:-Could not connect. Check the password.}" '{error: ($e | split("\n") | map(select(length > 0)) | last // "Could not connect" | sub("^Error: "; ""))}'
+        return 1
+      fi ;;
+    forget) nmcli connection delete id "${2:-}" >/dev/null 2>&1; wifi_status "$dev" ;;
     *) echo '{"error":"usage: wifi status|scan|connect <ssid>|forget <ssid>"}'; return 2 ;;
   esac
 }

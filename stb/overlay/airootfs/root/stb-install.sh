@@ -44,33 +44,37 @@ OFFLINE=0
 
 # ---------------------------------------------------------------- Wi-Fi
 say "Network"
-# USB Wi-Fi dongles must never be power-suspended (they vanish or stall),
-# and iwd must pick up /etc/iwd/main.conf (no MAC randomisation, no power save).
+# Wi-Fi goes through NetworkManager (wpa_supplicant). iwd cannot scan with some
+# Realtek USB dongles (rtl8xxxu, e.g. TP-Link TL-WN725N); this stack can.
+# USB dongles must never be power-suspended either.
 echo -1 > /sys/module/usbcore/parameters/autosuspend 2>/dev/null || true
 for f in /sys/bus/usb/devices/*/power/control; do echo on > "$f" 2>/dev/null || true; done
-systemctl restart iwd 2>/dev/null || true
+systemctl stop iwd systemd-networkd 2>/dev/null || true
+install -Dm644 "$FILES/nm-stb.conf" /etc/NetworkManager/conf.d/stb.conf
+systemctl restart NetworkManager 2>/dev/null || true
+for _ in $(seq 1 20); do nmcli -t general status >/dev/null 2>&1 && break; sleep 1; done
+nmcli radio wifi on 2>/dev/null || true
 sleep 3
 WIFI_DEV=$(for d in /sys/class/net/*; do [[ -d $d/wireless ]] && basename "$d"; done | head -n1)
 
-# Scan, wait until the adapter reports the scan finished (slow on USB
-# dongles), print the list. Succeeds if at least one network was found.
+# Rescan, print the list. Succeeds if at least one network was found.
 scan_networks() {
-  iwctl station "$WIFI_DEV" scan >/dev/null 2>&1
-  for _ in $(seq 1 20); do
-    sleep 1
-    iwctl station "$WIFI_DEV" show 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -Eq 'Scanning +no' && break
-  done
+  nmcli dev wifi rescan ifname "$WIFI_DEV" >/dev/null 2>&1
+  sleep 8
   local out
-  out=$(iwctl station "$WIFI_DEV" get-networks 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
-  printf '%s\n' "$out" | sed -n '1,25p' | indent
-  ! grep -qi 'no networks available' <<<"$out" && (( $(grep -c . <<<"$out") > 4 ))
+  out=$(nmcli -f SSID,SECURITY,SIGNAL,BARS dev wifi list ifname "$WIFI_DEV" --rescan no 2>/dev/null | awk 'NR==1 || $1 != "--"')
+  if (( $(grep -c . <<<"$out") > 1 )); then
+    printf '%s\n' "$out" | sed -n '1,20p' | indent
+    return 0
+  fi
+  return 1
 }
 
 if [[ -n $WIFI_DEV ]]; then
   drv=$(basename "$(readlink -f "/sys/class/net/$WIFI_DEV/device/driver")" 2>/dev/null)
   p "Wi-Fi adapter: $WIFI_DEV${drv:+ ($drv)}"
   [[ $OFFLINE == 1 ]] && p "(Packages are on this USB stick, so Wi-Fi is only set up for the box itself.)"
-  p "Scanning for networks... USB adapters can take up to 20 seconds."
+  p "Scanning for networks..."
   for attempt in 1 2 3 4 5 6; do
     if scan_networks; then
       if online; then
@@ -89,18 +93,23 @@ if [[ -n $WIFI_DEV ]]; then
       SSID=""
       break
     fi
-    read -r -s -p "${M}Password for \"$SSID\": " PSK; echo
-    if iwctl --passphrase "$PSK" station "$WIFI_DEV" connect "$SSID" 2>&1 | indent; then
-      for _ in $(seq 1 25); do online && break; sleep 1; done
+    read -r -s -p "${M}Password for \"$SSID\" (Enter if none): " PSK; echo
+    nmcli connection delete id "$SSID" >/dev/null 2>&1 || true
+    if [[ -n $PSK ]]; then
+      nmcli dev wifi connect "$SSID" password "$PSK" ifname "$WIFI_DEV" 2>&1 | indent
+    else
+      nmcli dev wifi connect "$SSID" ifname "$WIFI_DEV" 2>&1 | indent
     fi
+    for _ in $(seq 1 25); do online && break; sleep 1; done
     if online; then p "${c_g}Connected.${c_0}"; break; fi
     warn "Could not connect (attempt $attempt/6). Check the name and password."
   done
-  [[ -z ${SSID:-} ]] && p "Skipping Wi-Fi: you can connect later in the app (Settings > Network)."
+  [[ -z ${SSID:-} ]] && p "Skipping Wi-Fi: you can connect later in the app (Settings > System > Wi-Fi)."
 else
   warn "No Wi-Fi adapter found. Using Ethernet if plugged in."
   p "Tip: plug the USB Wi-Fi adapter in before booting the installer."
 fi
+# Ethernet (if plugged in) is handled by NetworkManager automatically.
 for _ in $(seq 1 15); do online && break; sleep 1; done
 if ! online; then
   if [[ $OFFLINE == 1 ]]; then
@@ -248,12 +257,12 @@ Section "InputClass"
 EndSection
 EOF
 
-# Network: iwd handles Wi-Fi + DHCP; systemd-networkd handles Ethernet.
-install -Dm644 "$FILES/iwd-main.conf" "$MNT/etc/iwd/main.conf"
-install -Dm644 "$FILES/20-wired.network" "$MNT/etc/systemd/network/20-wired.network"
-mkdir -p "$MNT/var/lib/iwd"
-cp -a /var/lib/iwd/*.psk /var/lib/iwd/*.open "$MNT/var/lib/iwd/" 2>/dev/null || true
-chmod 600 "$MNT"/var/lib/iwd/* 2>/dev/null || true
+# Network: NetworkManager handles Wi-Fi (wpa_supplicant) and Ethernet; DNS via
+# systemd-resolved. The Wi-Fi profile made in the installer is copied over.
+install -Dm644 "$FILES/nm-stb.conf" "$MNT/etc/NetworkManager/conf.d/stb.conf"
+mkdir -p "$MNT/etc/NetworkManager/system-connections"
+cp -a /etc/NetworkManager/system-connections/*.nmconnection "$MNT/etc/NetworkManager/system-connections/" 2>/dev/null || true
+chmod 600 "$MNT"/etc/NetworkManager/system-connections/* 2>/dev/null || true
 
 # Auto-login on tty1, no login banner.
 install -Dm644 "$FILES/getty-autologin.conf" "$MNT/etc/systemd/system/getty@tty1.service.d/autologin.conf"
@@ -270,8 +279,8 @@ useradd -m -G wheel,video,audio,input -s /bin/bash tv
 echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/10-wheel
 chmod 440 /etc/sudoers.d/10-wheel
 
-systemctl enable iwd systemd-networkd systemd-resolved systemd-timesyncd >/dev/null 2>&1
-systemctl mask systemd-networkd-wait-online.service >/dev/null 2>&1
+systemctl enable NetworkManager systemd-resolved systemd-timesyncd >/dev/null 2>&1
+systemctl mask NetworkManager-wait-online.service systemd-networkd-wait-online.service >/dev/null 2>&1
 
 bootctl install >/dev/null 2>&1
 EOF

@@ -8,7 +8,7 @@ base linux mkinitcpio intel-ucode sudo terminus-font
 linux-firmware-intel linux-firmware-realtek linux-firmware-atheros linux-firmware-mediatek
 
 # Networking
-iwd wireless-regdb iptables
+networkmanager wpa_supplicant wireless-regdb iptables iw
 
 # Graphics + hardware video decoding (Intel UHD / VA-API)
 mesa vulkan-intel intel-media-driver libva-utils

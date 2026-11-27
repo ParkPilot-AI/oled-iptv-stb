@@ -11,7 +11,7 @@ This kit builds a USB installer. It erases the OptiPlex's internal disk and inst
 | Session | Xorg + Openbox (no decorations, menus or shortcuts) + picom | picom is needed so the see-through player overlay can sit above mpv |
 | Video | mpv + `intel-media-driver` (VA-API) + Mesa | Hardware decoding of HEVC and H.264, including 4K |
 | Audio | PipeWire, switched to HDMI automatically at login | Sound comes out of the TV, not the headphone jack |
-| Network | iwd (Wi-Fi + DHCP), systemd-networkd (Ethernet), systemd-resolved | Lightweight. Boot doesn't wait for the network |
+| Network | NetworkManager + wpa_supplicant (Wi-Fi and Ethernet), systemd-resolved | Works with Realtek USB dongles. Boot doesn't wait for the network |
 | App | `/opt/oled-iptv`, restarted automatically if it exits or crashes | Behaves like an appliance |
 
 ---
@@ -58,7 +58,7 @@ If anything fails, the error is shown along with the log at `/root/stb-install.l
 | Maintenance shell | **Ctrl+Alt+F2**, log in as `tv` (sudo works). **Ctrl+Alt+F1** goes back to the TV |
 | System updates | `sudo pacman -Syu` from the maintenance shell, then reboot |
 | Restart the app | In the app choose **Settings → Exit app**. It relaunches in 2 seconds |
-| Change Wi-Fi | **Settings → System → Wi-Fi**: scan, pick a network, type the password with the remote. (Shell: `iwctl station wlan0 connect "NewNetwork"`.) |
+| Change Wi-Fi | **Settings → System → Wi-Fi**: scan, pick a network, type the password with the remote. (Shell: `nmcli dev wifi connect "NewNetwork" password "..."`.) |
 | Keep audio on the headphone jack | `echo STB_AUDIO=analog | sudo tee -a /etc/environment` |
 | Logs | `/tmp/oled-iptv.log` (app), `/tmp/xsession.log` (X) |
 | Update everything | **Settings → System → Update system**. One button updates the Arch packages (`pacman -Syu`) and the OLED IPTV app (from the newest GitHub release, checksum-verified, old version kept in `/opt/oled-iptv.old`). The app then restarts; a reboot is offered if a new kernel was installed. Log: `/var/log/stb-update.log` |
@@ -66,11 +66,11 @@ If anything fails, the error is shown along with the log at `/root/stb-install.l
 
 ## 5. USB Wi-Fi adapters
 
-Small Realtek USB dongles such as the **TP-Link TL-WN725N** (RTL8188EUS, `rtl8xxxu` driver) are supported. Both the installer and the box configure iwd to work around these dongles' quirks:
+Small Realtek USB dongles such as the **TP-Link TL-WN725N** (RTL8188EUS, `rtl8xxxu` driver) are supported. The installer and the box use NetworkManager with wpa_supplicant, because iwd returns empty scans with the `rtl8xxxu` driver. They also:
 
-* scan MAC randomisation is turned off, because these dongles return empty scans with it;
-* power saving is turned off for these drivers;
-* USB autosuspend is disabled (`usbcore.autosuspend=-1`), so the dongle doesn't disappear.
+* turn off scan MAC randomisation;
+* turn off Wi-Fi power saving (`wifi.powersave=2`);
+* disable USB autosuspend (`usbcore.autosuspend=-1`), so the dongle doesn't disappear.
 
 Plug the dongle in **before** booting the installer. Scans can take up to 20 s.
 

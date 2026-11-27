@@ -9,13 +9,14 @@ import { Modal } from './Modal.jsx';
 import { VirtualKeyboard } from './VirtualKeyboard.jsx';
 import { focusFirst } from '../nav/spatial.js';
 
-const bars = (rssi) => (rssi == null ? 0 : rssi >= -55 ? 4 : rssi >= -65 ? 3 : rssi >= -75 ? 2 : 1);
-const quality = (rssi) => ['', 'Weak', 'Fair', 'Good', 'Excellent'][bars(rssi)];
+// NetworkManager reports signal as 0–100 %.
+const bars = (sig) => (sig == null ? 0 : sig >= 75 ? 4 : sig >= 55 ? 3 : sig >= 35 ? 2 : 1);
+const quality = (sig) => ['', 'Weak', 'Fair', 'Good', 'Excellent'][bars(sig)];
 
-function Signal({ rssi }) {
-  const b = bars(rssi);
+function Signal({ signal }) {
+  const b = bars(signal);
   return (
-    <span className="wifi-bars" aria-label={quality(rssi)}>
+    <span className="wifi-bars" aria-label={quality(signal)}>
       {[1, 2, 3, 4].map((i) => (
         <i key={i} className={i <= b ? 'on' : ''} style={{ height: `${0.35 + i * 0.25}rem` }} />
       ))}
@@ -26,7 +27,7 @@ function Signal({ rssi }) {
 export function statusText(st) {
   if (!st) return 'Checking…';
   if (st.error) return st.error;
-  if (st.state === 'connected') return `${st.ssid} · ${quality(st.rssi) || 'Connected'}${st.ip ? ` · ${st.ip}` : ''}`;
+  if (st.state === 'connected') return `${st.ssid} · ${quality(st.signal) || 'Connected'}${st.ip ? ` · ${st.ip}` : ''}`;
   if (st.state === 'connecting') return 'Connecting…';
   return 'Not connected';
 }
@@ -157,7 +158,7 @@ function NetworkModal({ onClose }) {
                       {n.connected && <span className="net-tag">Connected</span>}
                     </span>
                     <span className="setting-value muted">
-                      {n.security === 'open' ? 'Open' : 'Secured'} <Signal rssi={n.rssi} />
+                      {n.security === 'open' ? 'Open' : 'Secured'} <Signal signal={n.signal} />
                     </span>
                   </Focusable>
                   {n.connected && (
