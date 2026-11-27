@@ -9,6 +9,7 @@ import { PosterCard, LandscapeCard, ChannelTile, Carousel, useRowLock, qualityTa
 import { PillTabs, useTabCycle } from '../components/PillTabs.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { focusFirst } from '../nav/spatial.js';
+import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
 import { clock, pad, humanDuration, progressPct } from '../lib/format.js';
 
 const N = 24;
@@ -167,7 +168,7 @@ function useDetails(hero) {
       api
         .invoke(it.kind === 'movie' ? 'vod:info' : 'series:info', { profileId: pid, item: { id: it.id, name: it.name, icon: it.icon, ext: it.ext } })
         .then((r) => {
-          const slim = { backdrop: r.backdrop, plot: r.plot, year: r.year, genre: r.genre, duration: r.duration, rating: r.rating, seasons: r.seasons?.length };
+          const slim = { backdrop: r.backdrop, plot: r.plot, year: r.year, genre: r.genre, duration: r.duration, rating: r.rating, seasons: r.seasons?.length, tmdbId: r.tmdbId };
           infoCache.set(key, slim);
           setInfo(slim);
         })
@@ -208,11 +209,17 @@ function Backdrop({ src, poster }) {
 
 function Spotlight({ hero }) {
   const info = useDetails(hero);
+  const mode = useArtSettings();
+  const it0 = hero?.item;
+  // Wait for provider details (may carry a TMDB id) before asking TMDB.
+  const art = useArt(it0 && info?.tmdbId ? { ...it0, tmdbId: info.tmdbId } : it0, !!hero && hero.kind !== 'live');
   if (!hero) return <section className="spotlight" />;
   const it = hero.item;
   const live = hero.kind === 'live';
-  const backdrop = live ? '' : info?.backdrop || (hero.kind === 'episode' ? it.icon : '') || it.icon || it.seriesIcon || '';
-  const isPoster = !live && !info?.backdrop && !(hero.kind === 'episode' && it.icon);
+  const wide = chooseArt(mode, info?.backdrop || (hero.kind === 'episode' ? it.icon : ''), art?.backdrop);
+  const backdrop = live ? '' : wide || it.icon || it.seriesIcon || '';
+  const isPoster = !live && !wide;
+  const clearlogo = !live && art?.logo;
   const rating = info?.rating || it.rating;
   const pills = live
     ? [it.num ? `CH ${it.num}` : null, hero.now ? `${clock(hero.now.start)} – ${clock(hero.now.stop)}` : null, ...qualityTags(it.name)]
@@ -225,7 +232,7 @@ function Spotlight({ hero }) {
         info?.genre?.split(/[,/]/)[0]?.trim(),
         hero.left > 0 ? `${humanDuration(hero.left)} left` : null,
       ];
-  const synopsis = live ? hero.now?.desc || (hero.next ? `Next: ${clock(hero.next.start)} ${hero.next.title}` : '') : info?.plot || it.plot || '';
+  const synopsis = live ? hero.now?.desc || (hero.next ? `Next: ${clock(hero.next.start)} ${hero.next.title}` : '') : info?.plot || it.plot || art?.overview || '';
 
   return (
     <section className="spotlight">
@@ -237,7 +244,13 @@ function Spotlight({ hero }) {
             {it.icon && <img className="spot-logo" src={imgUrl(it.icon, 240)} alt="" />}
           </div>
         )}
-        <h1 className="spot-title">{live && hero.now ? hero.now.title : hero.title}</h1>
+        {clearlogo ? (
+          <h1 className="spot-title spot-title-logo">
+            <img src={imgUrl(clearlogo, 800)} alt={hero.title} />
+          </h1>
+        ) : (
+          <h1 className="spot-title">{live && hero.now ? hero.now.title : hero.title}</h1>
+        )}
         {(hero.subtitle || (live && hero.now)) && <div className="spot-sub">{hero.subtitle || it.name}</div>}
         <div className="spot-pills">
           {pills.filter(Boolean).map((p) => (

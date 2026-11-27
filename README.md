@@ -152,11 +152,18 @@ In text fields and on Search, typing on a physical keyboard goes straight in, an
 
 ---
 
-## 5. Dedicated set-top box (Arch Linux)
+## 5. Artwork
+
+* **Channel logos** come from the open [iptv-org](https://github.com/iptv-org/api) database, with no key needed. Channels are matched by EPG id first, then by name (ignoring "UK:", "HD", "4K" and similar), using the country prefix to tell apart channels that share a name. Matching runs in the background worker and is refreshed weekly.
+* **Movie and series artwork** (posters, wide backdrops, title logos) comes from [TMDB](https://www.themoviedb.org). Enter your free API key under **Settings → Artwork**; either the v3 key or the v4 read token works. The TMDB id from the provider is used when available, otherwise the cleaned title and year. Results are cached on disk for 30 days (misses for 7).
+* Each source has a mode: *Fill gaps* (provider artwork first), *Prefer* (the external source first) or *Off*.
+* Attribution for TMDB and iptv-org is shown in Settings → About.
+
+## 6. Dedicated set-top box (Arch Linux)
 
 `stb/` builds a USB installer that turns the PC into a boot-to-player appliance. See [stb/README.md](stb/README.md).
 
-## 6. Notes and limits
+## 7. Notes and limits
 
 * Catch-up (`tv_archive`) is parsed but has no UI yet.
 * On Linux, the transparent OSD needs an X11 session with a compositor (Xfce/Xubuntu has one; the `stb/` image uses picom).

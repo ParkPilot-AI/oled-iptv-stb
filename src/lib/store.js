@@ -146,12 +146,18 @@ api.on('catalog:progress', (p) => {
   const label = { categories: 'Loading categories…', streams: 'Loading channels…', movies: `Loading movies & series… (${p.live ?? ''} channels)` }[p.stage];
   if (label) setState({ catalogStatus: { stage: label, error: null } });
 });
-api.on('catalog:updated', ({ profileId, catalog }) => {
+api.on('catalog:updated', ({ profileId, catalog, silent }) => {
   if (profileId === state.profileId) {
     setState({ catalog: indexCatalog(catalog) });
-    toast('Playlist updated');
+    if (!silent) toast('Playlist updated');
   }
 });
+
+/** Re-read the (cached) catalog, e.g. after changing the channel-logo setting. */
+export async function reloadCatalog() {
+  const raw = await api.invoke('catalog:load', { profileId: state.profileId });
+  setState({ catalog: indexCatalog(raw) });
+}
 api.on('epg:progress', (p) => p.mb && setState({ epgStatus: `Loading guide… ${p.mb} MB` }));
 api.on('epg:updated', () => setState((s) => ({ epgVersion: s.epgVersion + 1 })));
 api.on('player:closed', async () => {

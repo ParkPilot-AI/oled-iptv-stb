@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { useStore, setState, getState, toast, confirmDialog, activateProfile, loadEpg, applyAccent } from '../lib/store.js';
+import { useStore, setState, getState, toast, confirmDialog, activateProfile, loadEpg, applyAccent, reloadCatalog } from '../lib/store.js';
+import { clearArtCache } from '../lib/art.js';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
 
@@ -14,6 +15,8 @@ const OPTIONS = {
   epgTtlHours: [[3, 'Every 3 hours'], [6, 'Every 6 hours'], [12, 'Every 12 hours'], [24, 'Daily']],
   startFullscreen: [[true, 'On'], [false, 'Off']],
   accent: [['#3B82F6', 'Blue'], ['#10B981', 'Emerald'], ['#A78BFA', 'Violet'], ['#F59E0B', 'Amber']],
+  artSource: [['missing', 'Fill gaps (provider first)'], ['prefer', 'Prefer TMDB'], ['off', 'Off']],
+  logoSource: [['missing', 'Fill gaps (provider first)'], ['prefer', 'Prefer iptv-org'], ['off', 'Off']],
 };
 
 function Cycle({ label, k, settings, update, autoFocus }) {
@@ -55,6 +58,18 @@ export function Settings() {
     const s = await api.invoke('settings:update', patch);
     if (patch.accent) applyAccent(patch.accent);
     setState({ settings: s });
+    if ('artSource' in patch || 'tmdbKey' in patch) clearArtCache();
+    if ('logoSource' in patch) reloadCatalog().catch(() => {});
+  };
+  const saveTmdbKey = async (key) => {
+    if (!key) return update({ tmdbKey: '' });
+    try {
+      await api.invoke('art:testKey', key);
+      await update({ tmdbKey: key });
+      toast('TMDB key saved — artwork will appear as you browse');
+    } catch (e) {
+      toast(e.message || 'That key did not work', 5000);
+    }
   };
   const profile = profiles.list.find((p) => p.id === pid);
 
@@ -96,9 +111,30 @@ export function Settings() {
               activateProfile(getState().profileId, { force: true });
             }}
           />
+          <h2>Artwork</h2>
+          <TextField
+            label="TMDB API key"
+            value={settings.tmdbKey || ''}
+            mask
+            onChange={saveTmdbKey}
+            placeholder="Free at themoviedb.org → Settings → API"
+          />
+          <Cycle label="Movie & series artwork" k="artSource" settings={settings} update={update} />
+          <Cycle label="Channel logos" k="logoSource" settings={settings} update={update} />
+          <Action
+            label="Re-match channel logos now"
+            onSelect={() => {
+              toast('Matching channel logos…');
+              api.invoke('art:refreshLogos', { profileId: pid }).then(() => toast('Channel logos updated'));
+            }}
+          />
           <h2>About</h2>
           <Action label="Version" value={info ? `${info.version} · ${info.platform}` : ''} onSelect={() => {}} />
           <Action label="mpv" value={info?.mpvPath || 'Not found — see README'} onSelect={() => {}} />
+          <p className="credits-note">
+            Movie and TV artwork from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.
+            Channel logos from the iptv-org open database.
+          </p>
           <Action label="Credential storage" value={profiles.secureStorage ? 'OS keystore (encrypted)' : 'Obfuscated (no keystore)'} onSelect={() => {}} />
           <Action
             label="Exit app"

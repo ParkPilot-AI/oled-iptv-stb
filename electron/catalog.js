@@ -48,6 +48,54 @@ const memCatalog = new Map(); // profileId -> catalog
 const inflight = new Map();
 
 const catalogFile = (pid) => path.join(profileDir(pid), 'catalog.json');
+const logosFile = (pid) => path.join(profileDir(pid), 'logos.json');
+const LOGO_TTL = 7 * 864e5;
+const memLogos = new Map();
+const logoJobs = new Map();
+
+/** Apply matched iptv-org logos to live channels according to the logo setting. */
+async function withLogos(pid, cat) {
+  const mode = (await getSettings()).logoSource || 'missing';
+  const lg = memLogos.get(pid) || (await readJson(logosFile(pid), null));
+  if (lg) memLogos.set(pid, lg);
+  if (mode === 'off' || !lg?.map) return cat;
+  const map = lg.map;
+  return {
+    ...cat,
+    live: {
+      ...cat.live,
+      items: cat.live.items.map((it) => {
+        const u = map[it.id];
+        if (!u) return it;
+        return mode === 'prefer' || !it.icon ? { ...it, icon: u, providerIcon: it.icon } : it;
+      }),
+    },
+  };
+}
+
+/** Refresh the channel-logo match in the background when stale (or forced). */
+export async function refreshLogos(pid, notify, { force = false } = {}) {
+  if ((await getSettings()).logoSource === 'off') return null;
+  const cat = memCatalog.get(pid);
+  if (!cat) return null;
+  const lg = memLogos.get(pid) || (await readJson(logosFile(pid), null));
+  if (!force && lg && Date.now() - lg.fetchedAt < LOGO_TTL && lg.total === cat.live.items.length) return lg;
+  if (logoJobs.has(pid)) return logoJobs.get(pid);
+  const job = runJob('logos', { items: cat.live.items.map(({ id, name, epg }) => ({ id, name, epg })) })
+    .then(async (res) => {
+      memLogos.set(pid, res);
+      await writeJson(logosFile(pid), res);
+      notify?.('catalog:updated', { profileId: pid, catalog: await withLogos(pid, memCatalog.get(pid)), silent: true });
+      return res;
+    })
+    .catch((e) => {
+      console.warn('[logos]', e.message);
+      return null;
+    })
+    .finally(() => logoJobs.delete(pid));
+  logoJobs.set(pid, job);
+  return job;
+}
 const epgFile = (pid) => path.join(profileDir(pid), 'epg.json');
 
 async function fetchCatalog(pid, notify) {
@@ -68,7 +116,13 @@ async function fetchCatalog(pid, notify) {
  * are returned at once and refreshed in the background (renderer gets
  * 'catalog:updated'); a missing cache is fetched synchronously.
  */
-export async function loadCatalog(pid, { force = false } = {}, notify) {
+export async function loadCatalog(pid, opts = {}, notify) {
+  const cat = await loadCatalogRaw(pid, opts, notify);
+  setTimeout(() => refreshLogos(pid, notify), 3000);
+  return withLogos(pid, cat);
+}
+
+async function loadCatalogRaw(pid, { force = false } = {}, notify) {
   const ttl = (await getSettings()).catalogTtlHours * 3600e3;
   if (force) return fetchCatalog(pid, notify);
   let cat = memCatalog.get(pid) || (await readJson(catalogFile(pid), null));
@@ -76,7 +130,7 @@ export async function loadCatalog(pid, { force = false } = {}, notify) {
     memCatalog.set(pid, cat);
     if (Date.now() - cat.fetchedAt > ttl) {
       fetchCatalog(pid, notify)
-        .then((fresh) => notify?.('catalog:updated', { profileId: pid, catalog: fresh }))
+        .then(async (fresh) => notify?.('catalog:updated', { profileId: pid, catalog: await withLogos(pid, fresh) }))
         .catch((e) => console.warn('[catalog] background refresh failed:', e.message));
     }
     return cat;
@@ -101,7 +155,7 @@ export async function loadEpg(pid, { force = false } = {}, notify) {
   if (!epgInflight.has(pid)) {
     const p = (async () => {
       const creds = await getCredentials(pid);
-      const cat = memCatalog.get(pid) || (await loadCatalog(pid, {}, notify));
+      const cat = memCatalog.get(pid) || (await loadCatalogRaw(pid, {}, notify));
       const wanted = [...new Set(cat.live.items.map((s) => s.epg).filter(Boolean))];
       const epg = await runJob('epg', { creds, options: { wanted } }, (pr) => notify?.('epg:progress', pr));
       memEpg.set(pid, { index: epg.index, fetchedAt: epg.fetchedAt });
@@ -180,6 +234,8 @@ export function seriesInfo(pid, item) {
 export async function clearCaches(pid) {
   memCatalog.delete(pid);
   memEpg.delete(pid);
+  memLogos.delete(pid);
+  await fsp.rm(logosFile(pid), { force: true });
   detailCache.clear();
   await Promise.all([fsp.rm(catalogFile(pid), { force: true }), fsp.rm(epgFile(pid), { force: true })]);
 }

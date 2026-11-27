@@ -37,7 +37,7 @@ html.osd-root #root {
   align-items: center;
   justify-content: center;
   border-radius: 0.9rem;
-  background: rgba(18, 18, 18, 0.9);
+  background: var(--card);
   overflow: hidden;
 }
 .osd-logo img {
@@ -101,7 +101,7 @@ html.osd-root #root {
   right: 12rem;
   padding: 0.6rem 1.6rem;
   border-radius: 0.8rem;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--card);
   font-size: 3.4rem;
   font-weight: 700;
   color: var(--accent);
@@ -114,7 +114,7 @@ html.osd-root #root {
   transform: translateX(-50%);
   padding: 0.9rem 1.8rem;
   border-radius: 0.8rem;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--card);
   font-size: 1.3rem;
 }
 .osd-info {
@@ -124,7 +124,7 @@ html.osd-root #root {
   width: 30rem;
   padding: 1.4rem 1.8rem;
   border-radius: 1rem;
-  background: rgba(0, 0, 0, 0.82);
+  background: var(--card);
   font-size: 1.1rem;
 }
 .osd-info h3 {
@@ -151,7 +151,7 @@ html.osd-root #root {
   text-align: center;
   padding: 2rem 3rem;
   border-radius: 1rem;
-  background: rgba(0, 0, 0, 0.9);
+  background: var(--card);
 }
 .osd-paused {
   position: absolute;
@@ -181,8 +181,7 @@ html.osd-root #root {
   align-items: center;
   justify-content: center;
   border-radius: 1rem;
-  background: rgba(20, 20, 24, 0.75);
-  border: 1px solid rgba(234, 234, 234, 0.12);
+  background: var(--card);
   overflow: hidden;
 }
 .surf-logo img {
@@ -265,8 +264,8 @@ html.osd-root #root {
   display: flex;
   flex-direction: column;
   padding: 2.8rem 4rem 2rem 3rem;
-  /* backdrop-filter can't blur another window (mpv), so the glass is a dark tint. */
-  background: linear-gradient(to right, rgba(12, 12, 14, 0.92) 84%, rgba(12, 12, 14, 0));
+  background: var(--card);
+  border-right: 1px solid var(--line);
   animation: gg-in 0.3s var(--ease-spring, ease-out);
 }
 @keyframes gg-in {
@@ -326,7 +325,7 @@ html.osd-root #root {
   align-items: center;
   justify-content: center;
   border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.35);
+  background: #000;
   overflow: hidden;
 }
 .gg-logo img {

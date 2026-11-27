@@ -3,6 +3,7 @@ import { Focusable } from './Focusable.jsx';
 import { Icon } from './Icons.jsx';
 import { imgUrl } from '../lib/api.js';
 import { useStore, isFavorite } from '../lib/store.js';
+import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
 
 // One shared IntersectionObserver for all lazy images.
 let io = null;
@@ -74,11 +75,14 @@ export function qualityTags(name = '') {
 /** 2:3 poster card. Image-only in rows (the hero shows the title); `caption` adds a title below. */
 export const PosterCard = memo(function PosterCard({ item, onSelect, progress, subtitle, caption = false, focusKey, ...rest }) {
   const fav = useStore((s) => isFavorite(s.favorites, item));
+  const mode = useArtSettings();
+  const art = useArt(item, mode === 'prefer' || !item.icon);
+  const poster = chooseArt(mode, item.icon, art?.poster);
   return (
     <Focusable className={`poster-card ${caption ? 'has-caption' : ''}`} onSelect={onSelect} favItem={item} focusKey={focusKey} {...rest}>
       <div className="card-frame">
         <LazyImg
-          src={item.icon}
+          src={poster}
           width={360}
           className="poster-img"
           fallback={
@@ -107,10 +111,14 @@ export const PosterCard = memo(function PosterCard({ item, onSelect, progress, s
 
 /** 16:9 card for Continue Watching: artwork, title, episode badge, progress. */
 export const LandscapeCard = memo(function LandscapeCard({ item, title, badge, progress, onSelect, ...rest }) {
+  const mode = useArtSettings();
+  const art = useArt(item);
+  // 16:9 needs wide art: episode still → TMDB backdrop → provider poster.
+  const src = (item.kind === 'episode' && item.icon) || chooseArt(mode, '', art?.backdrop) || item.icon || item.seriesIcon;
   return (
     <Focusable className="landscape-card" onSelect={onSelect} favItem={item.kind === 'episode' ? undefined : item} {...rest}>
       <div className="card-frame">
-        <LazyImg src={item.icon || item.seriesIcon} width={640} className="poster-img" fallback={<span className="poster-initials">{initials(title)}</span>} />
+        <LazyImg src={src} width={640} className="poster-img" fallback={<span className="poster-initials">{initials(title)}</span>} />
         <div className="landscape-shade" />
         <div className="landscape-text">
           {badge && <span className="ep-badge">{badge}</span>}

@@ -179,6 +179,7 @@ export function normVodInfo(data, fallback = {}) {
     duration: durationSecs(info),
     icon: str(info.movie_image || info.cover_big || fallback.icon),
     backdrop: str(arr(info.backdrop_path)[0] || ''),
+    tmdbId: num(info.tmdb_id || info.tmdb) || null,
   };
 }
 
@@ -217,6 +218,7 @@ export function normSeriesInfo(data, fallback = {}) {
     rating: num(info.rating),
     icon: str(info.cover || fallback.icon),
     backdrop: str(arr(info.backdrop_path)[0] || ''),
+    tmdbId: num(info.tmdb_id || info.tmdb) || null,
     seasons,
   };
 }

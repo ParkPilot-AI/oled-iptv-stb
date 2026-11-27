@@ -7,6 +7,7 @@ import { Icon } from '../components/Icons.jsx';
 import { useBack } from '../nav/keys.js';
 import { pushScope, focusFirst } from '../nav/spatial.js';
 import { duration, humanDuration } from '../lib/format.js';
+import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
 
 /** Full-screen overlay with its own focus scope; Back closes it. */
 export function DetailOverlay({ children, className = '' }) {
@@ -50,7 +51,10 @@ export function MovieDetail({ item }) {
   const fav = useStore((s) => isFavorite(s.favorites, item));
   const ref = useRef(null);
   const resumable = prog && !prog.watched && prog.pos > 30;
-  const m = { ...item, ...(info || {}), kind: 'movie', icon: info?.icon || item.icon };
+  const mode = useArtSettings();
+  const art = useArt(info ? { ...item, tmdbId: info.tmdbId } : item, !!info || !!error);
+  const m0 = { ...item, ...(info || {}), kind: 'movie', icon: info?.icon || item.icon };
+  const m = { ...m0, icon: chooseArt(mode, m0.icon, art?.poster), backdrop: chooseArt(mode, m0.backdrop, art?.backdrop), plot: m0.plot || art?.overview || '' };
 
   useEffect(() => {
     requestAnimationFrame(() => focusFirst(ref.current));

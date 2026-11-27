@@ -7,6 +7,7 @@ import { VirtualList } from '../components/VirtualGrid.jsx';
 import { DetailOverlay, useDetailInfo } from './MovieDetail.jsx';
 import { focusFirst } from '../nav/spatial.js';
 import { epLabel, humanDuration, duration } from '../lib/format.js';
+import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
 
 export function SeriesDetail({ item }) {
   const { info, error } = useDetailInfo('series:info', item);
@@ -15,6 +16,11 @@ export function SeriesDetail({ item }) {
   const [seasonIdx, setSeasonIdx] = useState(0);
   const ref = useRef(null);
   const listRef = useRef(null);
+
+  const mode = useArtSettings();
+  const art = useArt(info ? { ...item, tmdbId: info.tmdbId } : item, !!info || !!error);
+  const backdrop = chooseArt(mode, info?.backdrop, art?.backdrop);
+  const poster = chooseArt(mode, info?.icon || item.icon, art?.poster);
 
   const playlist = useMemo(() => (info ? episodePlaylist(info, item) : []), [info, item]);
 
@@ -51,15 +57,15 @@ export function SeriesDetail({ item }) {
 
   return (
     <DetailOverlay className="series-detail">
-      {info?.backdrop && <LazyImg src={info.backdrop} width={1920} className="detail-backdrop" />}
+      {backdrop && <LazyImg src={backdrop} width={1920} className="detail-backdrop" />}
       <div className="detail-body" ref={ref}>
         <div className="series-side">
-          <LazyImg src={info?.icon || item.icon} width={480} className="detail-poster small" fallback={<Icon name="series" size="4rem" />} />
+          <LazyImg src={poster} width={480} className="detail-poster small" fallback={<Icon name="series" size="4rem" />} />
           <h1>{item.name}</h1>
           <div className="meta">{[info?.year || item.year, info?.genre, item.rating ? `★ ${Number(item.rating).toFixed(1)}` : ''].filter(Boolean).join('  ·  ')}</div>
           {!info && !error && <p className="muted">Loading episodes…</p>}
           {error && <p className="error-text">{error}</p>}
-          {info?.plot && <p className="plot clamp">{info.plot}</p>}
+          {(info?.plot || art?.overview) && <p className="plot clamp">{info?.plot || art.overview}</p>}
           <div className="col-buttons" data-focus-group="series-actions" data-focus-trap="up,down">
             {/* Right always goes to the season column (not straight to episodes). */}
             {resume && (

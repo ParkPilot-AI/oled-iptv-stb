@@ -7,6 +7,7 @@ const INVOKE = new Set([
   'settings:get', 'settings:update',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',
+  'art:get', 'art:testKey', 'art:refreshLogos',
   'doc:get', 'doc:set',
   'player:play', 'player:command', 'player:playlist',
 ]);

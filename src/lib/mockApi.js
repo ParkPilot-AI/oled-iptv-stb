@@ -110,7 +110,7 @@ export function createMockApi() {
   const listeners = new Map();
   const emit = (ch, data) => listeners.get(ch)?.forEach((cb) => cb(data));
   let catalog = null;
-  let settings = { liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, accent: '#3B82F6', ...ls.get('settings', {}) };
+  let settings = { tmdbKey: '', artSource: 'missing', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, accent: '#3B82F6', ...ls.get('settings', {}) };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -185,6 +185,13 @@ export function createMockApi() {
       };
     },
     'cache:clear': () => (catalog = null),
+    'art:get': () => null,
+    'art:testKey': async (key) => {
+      await wait(300);
+      if (!key || key.length < 20) throw new Error('TMDB rejected the API key');
+      return true;
+    },
+    'art:refreshLogos': () => null,
     'doc:get': ({ profileId, name }) => ls.get(`${profileId}:${name}`, {}),
     'doc:set': ({ profileId, name, data }) => ls.set(`${profileId}:${name}`, data),
     'player:play': async (args) => {

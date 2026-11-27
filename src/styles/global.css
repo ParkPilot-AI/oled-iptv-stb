@@ -6,7 +6,6 @@
   --bg: #000000;
   --card: #0c0c0e;
   --card-2: #16161a;
-  --glass: rgba(20, 20, 24, 0.75);
   --line: #1a1a1e;
   --text: #eaeaea;
   --muted: #9ca3af;
@@ -205,17 +204,16 @@ small {
   flex-direction: column;
   gap: 0.45rem;
   overflow: hidden;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.55));
+  background: #000;
   transition:
     width 0.32s var(--ease-spring),
     background-color 0.25s;
 }
 .rail.is-open {
   width: var(--rail-open);
-  background: rgba(12, 12, 14, 0.82);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  box-shadow: 1.5rem 0 4rem rgba(0, 0, 0, 0.8);
+  background: var(--card);
+  border-right: 1px solid var(--line);
+  box-shadow: 1.5rem 0 3rem #000;
 }
 .rail-brand {
   display: flex;
@@ -462,7 +460,7 @@ small {
   right: 0;
   bottom: 0;
   height: 0.3rem;
-  background: rgba(255, 255, 255, 0.18);
+  background: #2a2a30;
 }
 .card-progress div,
 .mini-progress div,
@@ -506,7 +504,7 @@ small {
   align-self: flex-start;
   padding: 0.1rem 0.55rem;
   border-radius: 0.4rem;
-  background: rgba(234, 234, 234, 0.14);
+  background: #26262b;
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1465,13 +1463,13 @@ small {
   gap: 0.55rem;
   padding: 0.5rem 1.3rem;
   border-radius: 2rem;
-  background: rgba(20, 20, 24, 0.6);
+  background: var(--card);
   color: var(--muted);
   font-size: 1.1rem;
   white-space: nowrap;
 }
 .pill.is-active {
-  background: rgba(234, 234, 234, 0.14);
+  background: #26262b;
   color: var(--text);
 }
 .pill:focus {
@@ -1519,7 +1517,7 @@ small {
   left: 35%;
   width: 65%;
   object-position: center 20%;
-  filter: blur(1px) brightness(0.85);
+  filter: brightness(0.85);
   -webkit-mask-image: linear-gradient(to right, transparent, #000 35%);
   mask-image: linear-gradient(to right, transparent, #000 35%);
 }
@@ -1577,6 +1575,19 @@ small {
   overflow: hidden;
   text-shadow: 0 0.2rem 1.5rem rgba(0, 0, 0, 0.6);
 }
+.spot-title-logo {
+  display: block;
+  -webkit-line-clamp: unset;
+  height: 8.5rem;
+  margin-bottom: 0.4rem;
+}
+.spot-title-logo img {
+  max-height: 100%;
+  max-width: 34rem;
+  object-fit: contain;
+  object-position: left bottom;
+  filter: drop-shadow(0 0.2rem 1.2rem rgba(0, 0, 0, 0.7));
+}
 .spot-sub {
   margin-top: 0.4rem;
   font-size: 1.35rem;
@@ -1591,8 +1602,7 @@ small {
 .meta-pill {
   padding: 0.2rem 0.75rem;
   border-radius: 2rem;
-  background: rgba(234, 234, 234, 0.1);
-  border: 1px solid rgba(234, 234, 234, 0.14);
+  background: #1c1c21;
   font-size: 0.95rem;
   color: #d4d4d8;
   white-space: nowrap;
@@ -1721,4 +1731,10 @@ small {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.credits-note {
+  padding: 0.4rem 1.4rem 0.8rem;
+  font-size: 0.95rem;
+  color: var(--muted);
 }

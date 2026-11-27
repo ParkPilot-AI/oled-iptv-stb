@@ -12,6 +12,29 @@ import {
   normSeries,
 } from '../xtream.js';
 import { createXmltvParser, createEpgCollector } from '../xmltv.js';
+import { buildLogoMatcher } from '../artmatch.js';
+
+const IPTV_ORG = process.env.IPTV_ORG_API || 'https://iptv-org.github.io/api';
+
+/** Match provider channels to iptv-org logos. items: [{id, name, epg}] → { [id]: url } */
+async function matchLogos(items, post) {
+  post({ stage: 'logos' });
+  const [channels, logos] = await Promise.all([
+    fetchJson(`${IPTV_ORG}/channels.json`, { timeoutMs: 120000 }),
+    fetchJson(`${IPTV_ORG}/logos.json`, { timeoutMs: 120000 }),
+  ]);
+  const match = buildLogoMatcher(channels, logos);
+  const map = {};
+  let hits = 0;
+  for (const it of items) {
+    const url = match(it);
+    if (url) {
+      map[it.id] = url;
+      hits++;
+    }
+  }
+  return { map, hits, total: items.length, fetchedAt: Date.now() };
+}
 
 async function loadCatalog(creds, post) {
   const get = (action) => fetchJson(apiUrl(creds, action), { timeoutMs: 120000 });
@@ -85,6 +108,7 @@ parentPort.on('message', async (msg) => {
     let result;
     if (msg.type === 'catalog') result = await loadCatalog(msg.creds, post);
     else if (msg.type === 'epg') result = await loadEpg(msg.creds, msg.options || {}, post);
+    else if (msg.type === 'logos') result = await matchLogos(msg.items || [], post);
     else throw new Error(`Unknown job ${msg.type}`);
     parentPort.postMessage({ id: msg.id, ok: true, result });
   } catch (err) {

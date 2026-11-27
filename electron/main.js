@@ -13,6 +13,7 @@ import * as catalog from './catalog.js';
 import { authenticate, normalizeServer } from './xtream.js';
 import { registerImageScheme, handleImageProtocol, pruneImageCache, clearImageCache } from './imageCache.js';
 import { Player } from './player.js';
+import { getArtwork, testTmdbKey, clearArtworkCache } from './artwork.js';
 import { resolveMpvBinary } from './mpv.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -179,8 +180,12 @@ const handlers = {
   'cache:clear': async ({ profileId }) => {
     await catalog.clearCaches(profileId);
     await clearImageCache();
+    await clearArtworkCache();
   },
 
+  'art:get': (q) => getArtwork(q),
+  'art:testKey': (key) => testTmdbKey(key),
+  'art:refreshLogos': ({ profileId }) => catalog.refreshLogos(profileId, sendMain, { force: true }),
   'doc:get': ({ profileId, name }) => store.getDoc(profileId, name),
   'doc:set': ({ profileId, name, data }) => store.setDoc(profileId, name, data),
 
