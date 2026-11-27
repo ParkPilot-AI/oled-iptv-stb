@@ -1965,3 +1965,66 @@ small {
   transform: translateX(1.5rem);
   background: #fff;
 }
+
+/* ---------- hub: spotlight carousel ---------- */
+.hub-host {
+  position: absolute;
+  inset: 0;
+}
+.spot-carousel {
+  position: absolute;
+  z-index: 2;
+  left: 3rem;
+  top: calc(60% - 5.2rem);
+  display: flex;
+  align-items: center;
+  gap: 1.6rem;
+}
+.spot-cta {
+  font-size: 1.15rem;
+}
+.spot-dots {
+  display: flex;
+  gap: 0.5rem;
+}
+.spot-dots i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.28);
+  transition: width 0.3s var(--ease-spring), background 0.3s;
+}
+.spot-dots i.is-on {
+  width: 1.6rem;
+  background: var(--text);
+}
+.spot-carousel-hint {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.has-carousel .spot-synopsis {
+  -webkit-line-clamp: 2;
+}
+
+/* Movies / TV Shows "Discover": the hub fills the page; the title sits over the spotlight. */
+.library2 {
+  position: relative;
+}
+.library2.is-hub .lib-head {
+  position: absolute;
+  z-index: 2;
+  top: -0.2rem;
+  right: 2.4rem;
+  pointer-events: none;
+}
+.library2.is-hub .lib-head h1 {
+  font-size: 1.6rem;
+}
+.library2.is-hub .lib-head .muted {
+  display: none;
+}
+.library2.is-hub .hub-host,
+.library2.is-hub > .home2 {
+  position: absolute;
+  inset: 0;
+}

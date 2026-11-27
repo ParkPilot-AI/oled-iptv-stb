@@ -161,6 +161,8 @@ In text fields and on Search, typing on a physical keyboard goes straight in, an
 
 Changes apply to what's playing. **Volume Up / Down / Mute** keys change the box's volume anywhere in the app, with an on-screen level indicator.
 
+**Discovery (needs a TMDB key).** Home opens on a spotlight carousel of trending films and shows (◀ ▶ to browse, it also advances by itself), followed by Continue Watching, *Because you watched…* recommendations for your two most recent titles, Popular Movies and Popular TV Shows. Movies and TV Shows each get a **Discover** tab with a trending carousel and Popular, Top Rated and Most Liked rows (most liked = most votes on TMDB). Every TMDB list is matched against your provider's catalogue (by the provider's TMDB id when it sends one, otherwise by title and year), so you only see titles you can play. Lists are cached for 12 hours.
+
 ## 5. Artwork
 
 * **Channel logos** come from the open [iptv-org](https://github.com/iptv-org/api) database, with no key needed. Channels are matched by EPG id first, then by name (ignoring "UK:", "HD", "4K" and similar), using the country prefix to tell apart channels that share a name. Matching runs in the background worker and is refreshed weekly.

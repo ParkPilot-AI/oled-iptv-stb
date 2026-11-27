@@ -10,6 +10,8 @@ const INVOKE = new Set([
   'audio:outputs',
   'system:poweroff',
   'volume:change',
+  'discover:lists',
+  'discover:recs',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',
   'art:get', 'art:testKey', 'art:refreshLogos',

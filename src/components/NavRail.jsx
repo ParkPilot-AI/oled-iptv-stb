@@ -8,7 +8,7 @@ export const SECTIONS = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'live', label: 'Live TV', icon: 'live' },
   { id: 'movies', label: 'Movies', icon: 'movie' },
-  { id: 'series', label: 'Series', icon: 'series' },
+  { id: 'series', label: 'TV Shows', icon: 'series' },
   { id: 'favorites', label: 'Favourites', icon: 'star' },
   { id: 'search', label: 'Search', icon: 'search' },
   { id: 'settings', label: 'Settings', icon: 'settings' },

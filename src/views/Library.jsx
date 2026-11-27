@@ -7,9 +7,11 @@ import { VirtualGrid } from '../components/VirtualGrid.jsx';
 import { PosterCard } from '../components/Cards.jsx';
 import { PillTabs, useTabCycle } from '../components/PillTabs.jsx';
 import { useBack } from '../nav/keys.js';
-import { focusEl, focusGroup } from '../nav/spatial.js';
+import { focusEl, focusGroup, focusFirst } from '../nav/spatial.js';
+import { Hub } from '../components/Hub.jsx';
+import { useDiscover } from '../lib/discover.js';
 
-const memory = { vod: { tab: '__recent', index: 0 }, series: { tab: '__recent', index: 0 } };
+const memory = { vod: { tab: null, index: 0 }, series: { tab: null, index: 0 } };
 const COLS = 8;
 
 export function Library({ section }) {
@@ -17,9 +19,14 @@ export function Library({ section }) {
   const favs = useStore((s) => s.favorites[section === 'vod' ? 'movie' : 'series']);
   const progress = useStore((s) => s.progress);
   const mem = memory[section];
-  const [tab, setTab] = useState(mem.tab);
-  const gridRef = useRef(null);
   const isVod = section === 'vod';
+  const disc = useDiscover(isVod ? 'movie' : 'tv');
+  const hasKey = useStore((s) => !!s.settings?.tmdbKey && s.settings?.artSource !== 'off');
+  const [tab, setTab] = useState(mem.tab || (hasKey ? '__discover' : '__recent'));
+  const gridRef = useRef(null);
+  const hubRef = useRef(null);
+  const discover = tab === '__discover';
+  const noun = isVod ? 'Movies' : 'Shows';
 
   const progressById = useMemo(() => {
     const m = new Map();
@@ -41,13 +48,14 @@ export function Library({ section }) {
   const tabs = useMemo(
     () =>
       [
+        hasKey && { id: '__discover', label: 'Discover' },
         { id: '__recent', label: 'Recently Added' },
         cw.length && { id: '__cw', label: 'Continue Watching', count: cw.length },
         { id: '__all', label: 'All', count: sec.items.length },
         { id: '__fav', label: 'Favourites', count: favs.length },
         ...sec.cats.map((c) => ({ id: c.id, label: c.name, count: c.count })),
       ].filter(Boolean),
-    [sec, favs.length, cw.length]
+    [sec, favs.length, cw.length, hasKey]
   );
 
   const items = useMemo(() => {
@@ -71,58 +79,87 @@ export function Library({ section }) {
     mem.index = 0;
     setTab(id);
   };
-  useTabCycle(tabs, tab, changeTab, () => requestAnimationFrame(() => gridRef.current?.focusIndex(0)));
+  const focusContent = (id = tab) =>
+    requestAnimationFrame(() => (id === '__discover' ? focusFirst(hubRef.current) : gridRef.current?.focusIndex(0)));
+  useTabCycle(tabs, tab, changeTab, focusContent);
 
   useEffect(() => {
+    if (discover) return; // the hub focuses its carousel itself
     requestAnimationFrame(() => gridRef.current?.focusIndex(Math.min(mem.index, items.length - 1)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const hubRows = useMemo(
+    () => [
+      { key: 'pop', title: `Popular ${noun}`, type: 'poster', items: disc.popular || [] },
+      { key: 'top', title: `Top Rated ${noun}`, type: 'poster', items: disc.top_rated || [] },
+      { key: 'liked', title: `Most Liked ${noun}`, type: 'poster', items: disc.most_liked || [] },
+    ],
+    [disc, noun]
+  );
+
   // Back: grid → the *active* tab (not just the last-focused one) → side menu.
   useBack(() => {
-    if (!document.activeElement?.closest('.lib-grid')) return false;
+    if (!document.activeElement?.closest('.lib-grid, .home-rows, .spot-carousel')) return false;
     const pill = document.querySelector('.lib-tabs .pill.is-active');
     return pill ? focusEl(pill) : focusGroup(`${section}-tabs`);
   });
 
   const label = tabs.find((t) => t.id === tab)?.label;
+  const pills = (
+    <PillTabs
+      key="tabs"
+      tabs={tabs}
+      active={tab}
+      onChange={changeTab}
+      group={`${section}-tabs`}
+      className={`lib-tabs ${discover ? 'home-tabs' : ''}`}
+      onSelected={focusContent}
+    />
+  );
   return (
-    <div className="library2">
-      <header className="lib-head">
-        <h1>{isVod ? 'Movies' : 'Series'}</h1>
+    <div className={`library2 ${discover ? 'is-hub' : ''}`} ref={hubRef}>
+      {discover && (
+        <Hub
+          key="hub"
+          rows={hubRows}
+          slides={(disc.trending || []).slice(0, 10)}
+          rowsKey={`${section}-discover`}
+          empty={<p className="empty big">Finding trending {noun.toLowerCase()} on your service…</p>}
+        />
+      )}
+      <header key="head" className="lib-head">
+        <h1>{isVod ? 'Movies' : 'TV Shows'}</h1>
         <span className="muted">
-          {label} · {items.length.toLocaleString()} titles
+          {label}
+          {!discover && ` · ${items.length.toLocaleString()} titles`}
         </span>
       </header>
-      <PillTabs
-        tabs={tabs}
-        active={tab}
-        onChange={changeTab}
-        group={`${section}-tabs`}
-        className="lib-tabs"
-        onSelected={() => requestAnimationFrame(() => gridRef.current?.focusIndex(0))}
-      />
-      <VirtualGrid
-        ref={gridRef}
-        className="lib-grid"
-        group={`${section}-grid`}
-        trap="down,right"
-        items={items}
-        columns={COLS}
-        rowHeight={25}
-        overscan={1}
-        empty={<p className="empty big">{tab === '__fav' ? 'Press F on any title to add it here.' : 'Nothing here yet'}</p>}
-        renderItem={(it, i) => (
-          <PosterCard
-            item={it}
-            caption
-            subtitle={it.year || undefined}
-            progress={isVod ? progressById.get(it.id) : 0}
-            onFocus={() => (mem.index = i)}
-            onSelect={() => openItem(it)}
-          />
-        )}
-      />
+      {pills}
+      {!discover && (
+        <VirtualGrid
+          key="grid"
+          ref={gridRef}
+          className="lib-grid"
+          group={`${section}-grid`}
+          trap="down,right"
+          items={items}
+          columns={COLS}
+          rowHeight={25}
+          overscan={1}
+          empty={<p className="empty big">{tab === '__fav' ? 'Press F on any title to add it here.' : 'Nothing here yet'}</p>}
+          renderItem={(it, i) => (
+            <PosterCard
+              item={it}
+              caption
+              subtitle={it.year || undefined}
+              progress={isVod ? progressById.get(it.id) : 0}
+              onFocus={() => (mem.index = i)}
+              onSelect={() => openItem(it)}
+            />
+          )}
+        />
+      )}
     </div>
   );
 }

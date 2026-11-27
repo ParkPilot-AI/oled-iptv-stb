@@ -164,6 +164,11 @@ export function normLive(list) {
     }));
 }
 
+const yearOf = (s) => {
+  const y = str(s.year || s.releaseDate || s.release_date || s.releasedate).slice(0, 4);
+  return /^(19|20)\d\d$/.test(y) ? y : '';
+};
+
 export function normVod(list) {
   return arr(list)
     .filter((s) => s && s.stream_id != null)
@@ -176,6 +181,8 @@ export function normVod(list) {
       rating: num(s.rating_5based) || num(s.rating) / 2 || 0,
       added: num(s.added),
       ext: str(s.container_extension) || 'mp4',
+      year: yearOf(s),
+      ...(num(s.tmdb || s.tmdb_id) ? { tmdbId: num(s.tmdb || s.tmdb_id) } : {}),
     }));
 }
 
@@ -190,7 +197,8 @@ export function normSeries(list) {
       icon: str(s.cover),
       rating: num(s.rating_5based) || num(s.rating) / 2 || 0,
       added: num(s.last_modified),
-      year: str(s.releaseDate || s.release_date).slice(0, 4),
+      year: yearOf(s),
+      ...(num(s.tmdb || s.tmdb_id) ? { tmdbId: num(s.tmdb || s.tmdb_id) } : {}),
     }));
 }
 

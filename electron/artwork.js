@@ -43,7 +43,7 @@ const release = () => {
   next ? next() : active--;
 };
 
-async function tmdb(pathname, params, key) {
+export async function tmdb(pathname, params, key) {
   const u = new URL(API + pathname);
   for (const [k, v] of Object.entries(params || {})) if (v !== '' && v != null) u.searchParams.set(k, v);
   const headers = { Accept: 'application/json', 'User-Agent': USER_AGENT };

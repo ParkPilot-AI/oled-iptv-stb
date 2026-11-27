@@ -267,6 +267,28 @@ export function createMockApi() {
     },
     'system:reboot': () => setTimeout(() => location.reload(), 500),
     'art:get': (q) => (settings.tmdbKey ? { poster: null, backdrop: backdropArt(q.id), logo: titleLogo(q.name), overview: null } : null),
+    'discover:lists': async ({ kind }) => {
+      if (!settings.tmdbKey) return {};
+      await wait(250);
+      catalog ||= makeCatalog();
+      const items = kind === 'tv' ? catalog.series.items : catalog.vod.items;
+      const fake = (it) => {
+        const m = /^(.*?)\s*\((\d{4})\)$/.exec(it.name);
+        return { id: 900000 + it.id, title: m ? m[1] : it.name, original: '', year: m ? m[2] : it.year || '', overview: `Trending pick: ${m ? m[1] : it.name}. A demo synopsis for the spotlight carousel.`, backdrop: backdropArt(it.id), poster: null, rating: 7.8 };
+      };
+      const list = (off, step) => Array.from({ length: 40 }, (_, i) => fake(items[(off + i * step) % items.length]));
+      return { trending: list(3, 37), popular: list(11, 53), top_rated: list(17, 71), most_liked: list(29, 89) };
+    },
+    'discover:recs': async ({ item }) => {
+      if (!settings.tmdbKey) return { results: [] };
+      catalog ||= makeCatalog();
+      const items = item.kind === 'series' ? catalog.series.items : catalog.vod.items;
+      const results = Array.from({ length: 20 }, (_, i) => items[(item.id * 7 + i * 13) % items.length]).map((it) => {
+        const m = /^(.*?)\s*\((\d{4})\)$/.exec(it.name);
+        return { id: 900000 + it.id, title: m ? m[1] : it.name, original: '', year: m ? m[2] : it.year || '', overview: '', backdrop: backdropArt(it.id), poster: null, rating: 7 };
+      });
+      return { source: 1, results };
+    },
     'art:testKey': async (key) => {
       await wait(300);
       if (!key || key.length < 20) throw new Error('TMDB rejected the API key');

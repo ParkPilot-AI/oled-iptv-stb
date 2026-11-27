@@ -18,6 +18,7 @@ import { Player } from './player.js';
 import { getArtwork, testTmdbKey, clearArtworkCache } from './artwork.js';
 import { resolveMpvBinary } from './mpv.js';
 import * as audio from './audio.js';
+import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
 // Settings that change what's playing right now.
@@ -329,6 +330,8 @@ const handlers = {
 
   'art:get': (q) => getArtwork(q),
   'art:testKey': (key) => testTmdbKey(key),
+  'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
+  'discover:recs': ({ item }) => discover.getRecommendations(item),
   'art:refreshLogos': ({ profileId }) => catalog.refreshLogos(profileId, sendMain, { force: true }),
   'doc:get': ({ profileId, name }) => store.getDoc(profileId, name),
   'doc:set': ({ profileId, name, data }) => store.setDoc(profileId, name, data),
