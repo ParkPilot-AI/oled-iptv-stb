@@ -4,10 +4,10 @@ A keyboard and D-pad driven IPTV player for a Windows or Linux mini PC connected
 
 ```
 ┌────────┬──────────────────────────────────────────────────────────┐
-│ ● rail │  Categories │ Channels (virtualised)   │  Now / Next EPG   │
-│ Search │  All  10000 │ 51  City Gold    ▓▓▓░    │  NOW Vision Live  │
-│ Home   │  UK News 250│ 52  Retro Echo   ▓▓░░    │  23:00–23:30 ▓▓▓░ │
-│ Live ◀ │  …          │ …                        │  23:30 Pulse Rpt  │
+│ ● rail │  Selected programme · live progress · synopsis              │
+│ Search │  [All] [Favourites] [UK News] …   11:30   12:00  ┊ 12:30    │
+│ Home   │  1 Metro HD  │ Antiques Hunt ▓▓┊▓▓│ Crime Files          │
+│ Live ◀ │  2 Plus      │ Quiz ▓┊ │ News at Ten     │ Crime Files    │
 └────────┴──────────────────────────────────────────────────────────┘
 ```
 

@@ -50,17 +50,24 @@ function makeCatalog() {
   };
 }
 
-function epgFor(id, from = Date.now(), count = 8) {
-  const slot = 30 * 60e3;
-  const base = Math.floor((from - slot) / slot) * slot;
-  const r = rnd(id.length * 7919 + Number(id.replace(/\D/g, '') || 0));
-  return Array.from({ length: count }, (_, i) => ({
-    start: base + i * slot,
-    stop: base + (i + 1) * slot,
-    title: `${WORDS[Math.floor(r() * WORDS.length)]} ${['Tonight', 'Live', 'Report', 'Weekly', 'Special'][i % 5]}`,
-    desc: 'A demo programme description from the mock EPG so layouts can be checked with realistic text length.',
-  })).filter((p) => p.stop > from - slot);
+const SHOWS = ['News at Ten', 'Premier Football Live', 'The Great Bake', 'Planet Wild', 'Late Show', 'Weather', 'Motor Racing', 'Antiques Hunt', 'Crime Files', 'Quiz Night', 'Documentary: Oceans', 'Cooking Live', 'Film: The Long Road', 'Kids Club', 'Music Hour'];
+const DURS = [30, 30, 30, 60, 60, 60, 90, 120];
+/** Deterministic per-channel schedule with varied programme lengths. */
+function schedule(id, from, to) {
+  const seed = [...String(id)].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0;
+  const r = rnd(seed);
+  const day = 864e5;
+  let t = Math.floor(from / day) * day - 6 * 3600e3;
+  const out = [];
+  while (t < to) {
+    const d = DURS[Math.floor(r() * DURS.length)] * 60e3;
+    const title = SHOWS[Math.floor(r() * SHOWS.length)];
+    if (t + d > from) out.push({ start: t, stop: t + d, title, desc: `${title}: a demo programme description from the mock guide, long enough to check wrapping and readability on a large TV.` });
+    t += d;
+  }
+  return out;
 }
+const epgFor = (id, from = Date.now(), count = 8) => schedule(id, from, from + 48 * 3600e3).slice(0, count);
 
 const ls = {
   get(k, d) {
@@ -136,6 +143,7 @@ export function createMockApi() {
       return out;
     },
     'epg:range': ({ epgId, from, limit }) => epgFor(epgId, from, limit),
+    'epg:grid': ({ ids, from, to }) => Object.fromEntries(ids.map((id) => [id, Number(id.replace(/\D/g, '')) % 9 === 8 ? [] : schedule(id, from, to)])),
     'epg:short': () => [],
     'vod:info': async ({ item }) => {
       await wait(150);

@@ -1061,3 +1061,265 @@ small {
   font-size: 1.6rem;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- live tv: timeline guide ---------- */
+.guide {
+  --chcol: 21rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 1rem;
+}
+.guide-hero {
+  flex: none;
+  height: 13.5rem;
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  padding: 0.4rem 0 1.4rem;
+}
+.hero-logo {
+  flex: none;
+  width: 13rem;
+  height: 7.5rem;
+  border-radius: 0.9rem;
+  background: #0d0d0d;
+}
+.hero-logo img {
+  object-fit: contain;
+  padding: 0.8rem;
+}
+.hero-text {
+  flex: 1;
+  min-width: 0;
+}
+.hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1.2rem;
+}
+.tag-muted {
+  background: #262626;
+  color: var(--text);
+}
+.hero-title {
+  font-size: 2.5rem;
+  margin: 0.45rem 0 0.2rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hero-progress {
+  max-width: 34rem;
+  margin: 0.5rem 0;
+}
+.hero-desc {
+  max-width: 72rem;
+  color: #bdbdbd;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hero-hint {
+  flex: none;
+  text-align: right;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.guide-chips {
+  flex: none;
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0.35rem 0.3rem 0.9rem;
+}
+.guide-chips::-webkit-scrollbar {
+  display: none;
+}
+.chip {
+  flex: none;
+  padding: 0.5rem 1.3rem;
+  border-radius: 2rem;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+.chip.is-active {
+  background: #262626;
+  color: var(--text);
+}
+.chip:focus {
+  background: var(--text);
+  color: #000;
+}
+
+.guide-timeline {
+  flex: none;
+  display: grid;
+  grid-template-columns: var(--chcol) 1fr;
+  height: 2.6rem;
+  align-items: end;
+  border-bottom: 1px solid var(--line);
+}
+.guide-day {
+  padding: 0 0 0.6rem 0.4rem;
+  font-weight: 600;
+}
+.guide-slots {
+  position: relative;
+  height: 100%;
+}
+.guide-slots span {
+  position: absolute;
+  bottom: 0.6rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid #333;
+  color: var(--muted);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.guide-now-cap {
+  position: absolute;
+  bottom: -0.35rem;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-left: -0.35rem;
+  border-radius: 50%;
+  background: var(--accent);
+  z-index: 3;
+}
+
+.guide-grid {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.guide-row {
+  display: grid;
+  grid-template-columns: var(--chcol) 1fr;
+  height: 5.4rem;
+  border-bottom: 1px solid #0d0d0d;
+}
+.guide-ch {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0 1rem 0 0.4rem;
+  min-width: 0;
+  color: var(--muted);
+  transition: color 0.12s;
+}
+.guide-row.is-focused .guide-ch {
+  color: var(--text);
+}
+.guide-num {
+  width: 3rem;
+  flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+}
+.guide-logo {
+  flex: none;
+  width: 5.6rem;
+  height: 3.6rem;
+  border-radius: 0.5rem;
+  background: #0d0d0d;
+}
+.guide-logo img {
+  object-fit: contain;
+  padding: 0.3rem;
+}
+.guide-logo .lazyimg-fallback {
+  font-size: 0.9rem;
+  color: #444;
+}
+.guide-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.guide-track {
+  position: relative;
+}
+.prog {
+  position: absolute;
+  top: 0.3rem;
+  bottom: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0 1rem;
+  overflow: hidden;
+  border-radius: 0.55rem;
+  border-right: 0.3rem solid #000; /* gap between programmes */
+  background: var(--card);
+  background-clip: padding-box;
+}
+.prog.is-live {
+  background: #1a1a1a;
+  background-clip: padding-box;
+}
+.prog.is-empty {
+  background: #0b0b0b;
+  background-clip: padding-box;
+  color: #555;
+  font-style: italic;
+}
+.prog.cut-left {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.prog-title,
+.prog-time {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prog-title {
+  font-size: 1.15rem;
+}
+.prog-time {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.prog-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 0.22rem;
+  background: var(--accent);
+}
+.prog:focus {
+  background: var(--accent);
+  background-clip: padding-box;
+  color: #fff;
+  z-index: 2;
+}
+.prog:focus .prog-time {
+  color: rgba(255, 255, 255, 0.85);
+}
+.prog:focus .prog-progress {
+  background: #fff;
+}
+.guide-now {
+  position: absolute;
+  top: 0;
+  left: calc(var(--chcol) + (100% - var(--chcol)) * var(--now));
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  opacity: 0.85;
+  z-index: 3;
+  pointer-events: none;
+}

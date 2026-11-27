@@ -132,6 +132,19 @@ export function epgRange(pid, epgId, from = Date.now(), limit = 12) {
   return idx && epgId ? range(idx[epgId.toLowerCase()], from, limit) : [];
 }
 
+/** Full schedules for many channels within [from, to] (TV-guide grid). */
+export function epgGrid(pid, epgIds, from, to) {
+  const idx = memEpg.get(pid)?.index;
+  const out = {};
+  for (const id of epgIds) {
+    const list = idx?.[String(id).toLowerCase()];
+    out[id] = list
+      ? list.filter((p) => p[1] > from && p[0] < to).map((p) => ({ start: p[0], stop: p[1], title: p[2], desc: p[3] }))
+      : [];
+  }
+  return out;
+}
+
 export async function shortEpg(pid, streamId, limit = 6) {
   const creds = await getCredentials(pid);
   const data = await fetchJson(apiUrl(creds, 'get_short_epg', { stream_id: streamId, limit }), {

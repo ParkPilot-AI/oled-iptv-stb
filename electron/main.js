@@ -172,6 +172,7 @@ const handlers = {
   'epg:load': ({ profileId, force }) => catalog.loadEpg(profileId, { force }, sendMain),
   'epg:nowNext': ({ profileId, ids, at }) => catalog.epgNowNext(profileId, ids, at),
   'epg:range': ({ profileId, epgId, from, limit }) => catalog.epgRange(profileId, epgId, from, limit),
+  'epg:grid': ({ profileId, ids, from, to }) => catalog.epgGrid(profileId, ids, from, to),
   'epg:short': ({ profileId, streamId }) => catalog.shortEpg(profileId, streamId),
   'vod:info': ({ profileId, item }) => catalog.vodInfo(profileId, item),
   'series:info': ({ profileId, item }) => catalog.seriesInfo(profileId, item),

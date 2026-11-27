@@ -5,7 +5,7 @@ const INVOKE = new Set([
   'app:info', 'app:quit', 'app:toggleFullscreen',
   'profiles:list', 'profiles:save', 'profiles:delete', 'profiles:activate',
   'settings:get', 'settings:update',
-  'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:short',
+  'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',
   'doc:get', 'doc:set',
   'player:play', 'player:command',
