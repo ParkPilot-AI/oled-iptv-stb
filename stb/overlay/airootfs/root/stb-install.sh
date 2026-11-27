@@ -72,7 +72,15 @@ timedatectl set-ntp true 2>/dev/null || true
 
 # ---------------------------------------------------------------- disk
 say "Choose the disk to ERASE"
-BOOT_DEV=$(lsblk -no PKNAME "$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null)" 2>/dev/null || true)
+# The USB stick we booted from must never be offered: find it via the mounted
+# boot medium, or via the ISO label passed on the kernel command line.
+boot_part=$(findmnt -no SOURCE /run/archiso/bootmnt 2>/dev/null)
+if [[ -z $boot_part ]]; then
+  label=$(sed -n 's/.*archisolabel=\([^ ]*\).*/\1/p' /proc/cmdline)
+  [[ -n $label ]] && boot_part=$(blkid -L "$label" 2>/dev/null)
+fi
+BOOT_DEV=$( [[ -n $boot_part ]] && lsblk -no PKNAME "$boot_part" 2>/dev/null | head -n1 )
+[[ -z $BOOT_DEV && -n $boot_part ]] && BOOT_DEV=$(basename "$boot_part")
 mapfile -t DISKS < <(lsblk -dpno NAME,TYPE,RM | awk '$2=="disk"{print $1}' | grep -v -e "^/dev/${BOOT_DEV:-none}$" -e '/dev/zram' -e '/dev/loop')
 [[ ${#DISKS[@]} -gt 0 ]] || die "No internal disk found. In the BIOS, set SATA/NVMe mode to AHCI (not RAID)."
 i=1
@@ -83,9 +91,18 @@ done
 if [[ ${#DISKS[@]} -eq 1 ]]; then
   DISK=${DISKS[0]}
 else
-  n=$(ask "Number of the disk to use: ")
-  [[ $n =~ ^[0-9]+$ ]] && (( n >= 1 && n <= ${#DISKS[@]} )) || die "Invalid choice."
-  DISK=${DISKS[$((n - 1))]}
+  DISK=""
+  while [[ -z $DISK ]]; do
+    n=$(ask "Type the NUMBER of the disk to erase (1-${#DISKS[@]}): ")
+    n=${n// /}
+    if [[ $n =~ ^[0-9]+$ ]] && (( n >= 1 && n <= ${#DISKS[@]} )); then
+      DISK=${DISKS[$((n - 1))]}
+    else
+      # Also accept a device name such as /dev/sda or sda.
+      for d in "${DISKS[@]}"; do [[ $n == "$d" || "/dev/$n" == "$d" ]] && DISK=$d; done
+      [[ -z $DISK ]] && warn "Not a valid choice — type 1 to ${#DISKS[@]}."
+    fi
+  done
 fi
 echo
 echo "${c_r}${c_b}ALL DATA on $DISK ($(lsblk -dno SIZE "$DISK")) will be permanently erased.${c_0}"
