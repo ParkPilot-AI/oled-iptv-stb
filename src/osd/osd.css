@@ -159,3 +159,215 @@ html.osd-root #root {
   left: 3.5rem;
   opacity: 0.55;
 }
+
+/* ---------- channel surf banner (bottom third) ---------- */
+.surf {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2rem;
+  padding: 8rem 5rem 3.5rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.94) 0%, rgba(0, 0, 0, 0.72) 55%, transparent 100%);
+  animation: osd-in 0.22s var(--ease-spring, ease-out);
+}
+.surf-logo {
+  flex: none;
+  width: 12rem;
+  height: 8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: rgba(20, 20, 24, 0.75);
+  border: 1px solid rgba(234, 234, 234, 0.12);
+  overflow: hidden;
+}
+.surf-logo img {
+  max-width: 85%;
+  max-height: 85%;
+  object-fit: contain;
+}
+.surf-main {
+  flex: 1;
+  min-width: 0;
+}
+.surf-ch {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 2.4rem;
+  font-weight: 650;
+}
+.surf-num {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.surf-pos {
+  font-size: 1.1rem;
+  font-weight: 400;
+}
+.surf-now {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-top: 0.4rem;
+  font-size: 1.5rem;
+}
+.surf-now .muted {
+  font-size: 1.15rem;
+}
+.surf-main .progress {
+  max-width: 40rem;
+}
+.surf-next {
+  font-size: 1.2rem;
+}
+.surf-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+  font-size: 1.05rem;
+}
+.surf-timer {
+  width: 12rem;
+  height: 0.25rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+.surf-timer div {
+  height: 100%;
+  background: var(--text);
+  transform-origin: left;
+  animation: surf-count 1.8s linear forwards;
+}
+@keyframes surf-count {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ---------- glass channel guide over live video ---------- */
+.glass-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 46rem;
+  display: flex;
+  flex-direction: column;
+  padding: 2.8rem 4rem 2rem 3rem;
+  /* backdrop-filter can't blur another window (mpv), so the glass is a dark tint. */
+  background: linear-gradient(to right, rgba(12, 12, 14, 0.92) 84%, rgba(12, 12, 14, 0));
+  animation: gg-in 0.3s var(--ease-spring, ease-out);
+}
+@keyframes gg-in {
+  from {
+    opacity: 0;
+    transform: translateX(-2rem);
+  }
+}
+.gg-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 1rem 1rem 0.4rem;
+  font-size: 1.6rem;
+  font-weight: 650;
+}
+.gg-head .muted {
+  font-size: 1rem;
+  font-weight: 400;
+}
+.gg-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.gg-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  height: 6.2rem;
+  padding: 0 1.1rem;
+  border-radius: 0.9rem;
+  color: #c7c7cc;
+  transition:
+    background-color 0.18s,
+    transform 0.3s var(--ease-spring);
+}
+.gg-row.is-sel {
+  background: var(--text);
+  color: #000;
+  text-shadow: none;
+  transform: scale(1.02);
+}
+.gg-num {
+  width: 3rem;
+  flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+.gg-logo {
+  flex: none;
+  width: 6rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.gg-logo img {
+  max-width: 85%;
+  max-height: 85%;
+  object-fit: contain;
+}
+.gg-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.gg-name,
+.gg-text small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gg-name {
+  font-weight: 600;
+}
+.gg-text small {
+  opacity: 0.75;
+  font-size: 1rem;
+}
+.gg-row.is-sel .mini-progress {
+  background: rgba(0, 0, 0, 0.15);
+}
+.gg-badge {
+  margin-left: 0.6rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 0.35rem;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: 0.15rem;
+}
+.gg-foot {
+  padding: 1rem 0.4rem 0;
+  font-size: 0.95rem;
+}

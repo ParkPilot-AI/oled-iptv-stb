@@ -36,12 +36,12 @@ export function Search() {
             </Carousel>
             <Carousel title={`Movies · ${res.movies.length}`} group="s-movies" count={res.movies.length}>
               {res.movies.map((m) => (
-                <PosterCard key={m.id} item={m} onSelect={() => openItem(m)} />
+                <PosterCard key={m.id} item={m} caption subtitle={m.year} onSelect={() => openItem(m)} />
               ))}
             </Carousel>
             <Carousel title={`Series · ${res.series.length}`} group="s-series" count={res.series.length}>
               {res.series.map((m) => (
-                <PosterCard key={m.id} item={m} subtitle={m.year} onSelect={() => openItem(m)} />
+                <PosterCard key={m.id} item={m} caption subtitle={m.year} onSelect={() => openItem(m)} />
               ))}
             </Carousel>
           </>

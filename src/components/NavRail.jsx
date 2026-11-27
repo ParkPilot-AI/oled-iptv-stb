@@ -4,16 +4,16 @@ import { Icon } from './Icons.jsx';
 import { focusFirst } from '../nav/spatial.js';
 
 export const SECTIONS = [
-  { id: 'search', label: 'Search', icon: 'search' },
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'live', label: 'Live TV', icon: 'live' },
   { id: 'movies', label: 'Movies', icon: 'movie' },
   { id: 'series', label: 'Series', icon: 'series' },
-  { id: 'favorites', label: 'Favorites', icon: 'star' },
+  { id: 'favorites', label: 'Favourites', icon: 'star' },
+  { id: 'search', label: 'Search', icon: 'search' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
-/** Collapsible left rail: icons only until it receives focus, then expands with labels. */
+/** Floating pill rail: 72 px icon column, expands to a 240 px glass panel with labels while focused. */
 export function NavRail({ section, onSelect }) {
   const ref = useRef(null);
   const [open, setOpen] = useState(false);

@@ -305,6 +305,7 @@ const GuideRow = memo(function GuideRow({ ch, rowIndex, focusedRow, focusedStart
                 {!p.placeholder && (
                   <span className="prog-time">
                     {clock(p.start)} – {clock(p.stop)}
+                    {live && <span className="prog-left"> · {humanDuration((p.stop - now) / 1000) || '<1m'} left</span>}
                   </span>
                 )}
                 {live && !p.placeholder && <span className="prog-progress" style={{ width: `${progressPct(a, b, now)}%` }} />}
@@ -327,7 +328,7 @@ function Hero({ channel, prog, now }) {
       <LazyImg src={channel.icon} width={320} className="hero-logo" fallback={<Icon name="live" size="3rem" />} />
       <div className="hero-text">
         <div className="hero-meta">
-          {when && <span className={`tag ${live ? '' : 'tag-muted'}`}>{when}</span>}
+          {when && <span className={`tag ${live ? 'tag-live' : 'tag-muted'}`}>{when}</span>}
           <span>
             {channel.num ? `${channel.num} · ` : ''}
             {channel.name}

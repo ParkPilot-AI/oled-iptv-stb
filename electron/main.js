@@ -186,6 +186,7 @@ const handlers = {
 
   'player:play': (args) => player.play(args),
   'player:command': (cmd) => player.command(cmd),
+  'player:playlist': () => player.session?.items ?? [],
 };
 
 for (const [channel, fn] of Object.entries(handlers)) {

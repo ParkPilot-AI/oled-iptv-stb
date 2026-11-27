@@ -1,24 +1,41 @@
 import { useEffect, useState } from 'react';
 import { clock } from '../lib/format.js';
+import { imgUrl } from '../lib/api.js';
+
+const spot = () => ({ x: 4 + Math.random() * 62, y: 6 + Math.random() * 74 });
 
 /**
- * Pure-black OLED screensaver: everything off except a tiny dim clock that
- * jumps to a new random position every 20 s (pixel-shift), so no pixel is lit
- * for long.
+ * OLED screensaver: fades to pure black; a dim clock (plus optional
+ * now-playing artwork and title) drifts continuously across the screen, so no
+ * pixel is lit in the same place for long.
  */
-export function Screensaver() {
-  const [pos, setPos] = useState({ x: 40, y: 40 });
+export function Screensaver({ title, subtitle, art }) {
+  const [pos, setPos] = useState(spot);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
+    // Start drifting right away, then pick a new target every 19 s (= transition time).
+    const first = setTimeout(() => setPos(spot()), 50);
     const t = setInterval(() => {
       setNow(Date.now());
-      setPos({ x: 5 + Math.random() * 80, y: 5 + Math.random() * 85 });
-    }, 20000);
-    return () => clearInterval(t);
+      setPos(spot());
+    }, 19000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
   }, []);
   return (
     <div className="screensaver">
-      <span style={{ left: `${pos.x}%`, top: `${pos.y}%` }}>{clock(now)}</span>
+      <div className="saver-block" style={{ transform: `translate(${pos.x}vw, ${pos.y}vh)` }}>
+        {art && <img className="saver-art" src={imgUrl(art, 240)} alt="" />}
+        <span className="saver-clock">{clock(now)}</span>
+        {title && (
+          <span className="saver-info">
+            <b>{title}</b>
+            {subtitle && <span>{subtitle}</span>}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

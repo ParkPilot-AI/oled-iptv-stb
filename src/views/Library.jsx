@@ -1,57 +1,57 @@
+// Movies / Series hub: pill tabs across the top (hubs first, then the
+// provider's categories), full-width 2:3 poster grid below.
+// PageUp/PageDown cycle the tabs; Back goes grid → tabs → side menu.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, openItem } from '../lib/store.js';
-import { VirtualList, VirtualGrid } from '../components/VirtualGrid.jsx';
-import { Focusable } from '../components/Focusable.jsx';
+import { VirtualGrid } from '../components/VirtualGrid.jsx';
 import { PosterCard } from '../components/Cards.jsx';
+import { PillTabs, useTabCycle } from '../components/PillTabs.jsx';
 import { useBack } from '../nav/keys.js';
-import { focusGroup } from '../nav/spatial.js';
+import { focusEl, focusGroup } from '../nav/spatial.js';
 
-const memory = { vod: { cat: '__recent', index: 0 }, series: { cat: '__recent', index: 0 } };
-const COLS = 6;
+const memory = { vod: { tab: '__recent', index: 0 }, series: { tab: '__recent', index: 0 } };
+const COLS = 8;
 
-/** Movies / Series browser: category column + virtualised poster grid. */
 export function Library({ section }) {
   const sec = useStore((s) => s.catalog[section]);
   const favs = useStore((s) => s.favorites[section === 'vod' ? 'movie' : 'series']);
   const progress = useStore((s) => s.progress);
   const mem = memory[section];
-  const [catId, setCatId] = useState(mem.cat);
+  const [tab, setTab] = useState(mem.tab);
   const gridRef = useRef(null);
-  const timer = useRef(null);
+  const isVod = section === 'vod';
 
   const progressById = useMemo(() => {
     const m = new Map();
-    for (const p of Object.values(progress)) {
-      if (p.item.kind === 'movie' && !p.watched && p.dur) m.set(p.item.id, (p.pos / p.dur) * 100);
-    }
+    for (const p of Object.values(progress)) if (p.item.kind === 'movie' && !p.watched && p.dur) m.set(p.item.id, (p.pos / p.dur) * 100);
     return m;
   }, [progress]);
 
   const cw = useMemo(
     () =>
-      section === 'vod'
+      isVod
         ? Object.values(progress)
             .filter((p) => p.item.kind === 'movie' && !p.watched && p.pos > 30)
             .sort((a, b) => b.updatedAt - a.updatedAt)
             .map((p) => p.item)
         : [],
-    [progress, section]
+    [progress, isVod]
   );
 
-  const cats = useMemo(
+  const tabs = useMemo(
     () =>
       [
-        cw.length && { id: '__cw', name: 'Continue Watching', count: cw.length },
-        { id: '__recent', name: 'Recently Added', count: Math.min(200, sec.items.length) },
-        { id: '__all', name: section === 'vod' ? 'All Movies' : 'All Series', count: sec.items.length },
-        { id: '__fav', name: 'Favorites', count: favs.length },
-        ...sec.cats,
+        { id: '__recent', label: 'Recently Added' },
+        cw.length && { id: '__cw', label: 'Continue Watching', count: cw.length },
+        { id: '__all', label: 'All', count: sec.items.length },
+        { id: '__fav', label: 'Favourites', count: favs.length },
+        ...sec.cats.map((c) => ({ id: c.id, label: c.name, count: c.count })),
       ].filter(Boolean),
-    [sec, favs.length, cw.length, section]
+    [sec, favs.length, cw.length]
   );
 
   const items = useMemo(() => {
-    switch (catId) {
+    switch (tab) {
       case '__cw':
         return cw;
       case '__recent':
@@ -61,66 +61,63 @@ export function Library({ section }) {
       case '__fav':
         return favs;
       default:
-        return sec.byCat.get(catId) || [];
+        return sec.byCat.get(tab) || [];
     }
-  }, [catId, sec, favs, cw]);
+  }, [tab, sec, favs, cw]);
+
+  const changeTab = (id) => {
+    if (id === tab) return;
+    mem.tab = id;
+    mem.index = 0;
+    setTab(id);
+  };
+  useTabCycle(tabs, tab, changeTab, () => requestAnimationFrame(() => gridRef.current?.focusIndex(0)));
 
   useEffect(() => {
     requestAnimationFrame(() => gridRef.current?.focusIndex(Math.min(mem.index, items.length - 1)));
-    return () => clearTimeout(timer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useBack(() => (document.activeElement?.closest('.lib-grid') ? focusGroup(`${section}-cats`) : false));
+  // Back: grid → the *active* tab (not just the last-focused one) → side menu.
+  useBack(() => {
+    if (!document.activeElement?.closest('.lib-grid')) return false;
+    const pill = document.querySelector('.lib-tabs .pill.is-active');
+    return pill ? focusEl(pill) : focusGroup(`${section}-tabs`);
+  });
 
-  const selectCat = (id, immediate) => {
-    clearTimeout(timer.current);
-    if (id === catId) return;
-    const apply = () => {
-      mem.cat = id;
-      mem.index = 0;
-      setCatId(id);
-    };
-    immediate ? apply() : (timer.current = setTimeout(apply, 180));
-  };
-
+  const label = tabs.find((t) => t.id === tab)?.label;
   return (
-    <div className="library">
-      <VirtualList
-        className="lib-cats"
-        group={`${section}-cats`}
-        items={cats}
-        rowHeight={4.25}
-        renderItem={(c) => (
-          <Focusable
-            className={`list-row cat-row ${c.id === catId ? 'is-active' : ''}`}
-            data-focus-default={c.id === catId ? '' : undefined}
-            onFocus={() => selectCat(c.id)}
-            onSelect={() => {
-              selectCat(c.id, true);
-              requestAnimationFrame(() => gridRef.current?.focusIndex(0));
-            }}
-          >
-            <span className="cat-name">{c.name}</span>
-            <span className="count">{c.count}</span>
-          </Focusable>
-        )}
+    <div className="library2">
+      <header className="lib-head">
+        <h1>{isVod ? 'Movies' : 'Series'}</h1>
+        <span className="muted">
+          {label} · {items.length.toLocaleString()} titles
+        </span>
+      </header>
+      <PillTabs
+        tabs={tabs}
+        active={tab}
+        onChange={changeTab}
+        group={`${section}-tabs`}
+        className="lib-tabs"
+        onSelected={() => requestAnimationFrame(() => gridRef.current?.focusIndex(0))}
       />
       <VirtualGrid
         ref={gridRef}
         className="lib-grid"
         group={`${section}-grid`}
-        trap="up,down,right"
+        trap="down,right"
         items={items}
         columns={COLS}
-        rowHeight={26}
+        rowHeight={25}
         overscan={1}
-        empty={<p className="empty">{catId === '__fav' ? 'Press F on any title to add it here.' : 'Nothing here yet'}</p>}
+        empty={<p className="empty big">{tab === '__fav' ? 'Press F on any title to add it here.' : 'Nothing here yet'}</p>}
         renderItem={(it, i) => (
           <PosterCard
             item={it}
+            caption
             subtitle={it.year || undefined}
-            progress={section === 'vod' ? progressById.get(it.id) : 0}
+            progress={isVod ? progressById.get(it.id) : 0}
             onFocus={() => (mem.index = i)}
             onSelect={() => openItem(it)}
           />

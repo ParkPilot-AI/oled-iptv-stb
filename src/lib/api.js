@@ -8,7 +8,8 @@ export const api = isDesktop ? window.iptv : createMockApi();
 
 /** Map a remote image URL to the disk-caching, downscaling imgcache:// protocol. */
 export function imgUrl(src, width = 480) {
-  if (!src || !/^https?:\/\//i.test(src)) return '';
-  if (!isDesktop) return src;
+  if (!src) return '';
+  if (!isDesktop) return /^(https?:|data:)/i.test(src) ? src : ''; // browser demo uses data: art
+  if (!/^https?:\/\//i.test(src)) return '';
   return `imgcache://img/?w=${width}&u=${encodeURIComponent(src)}`;
 }

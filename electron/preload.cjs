@@ -8,7 +8,7 @@ const INVOKE = new Set([
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',
   'doc:get', 'doc:set',
-  'player:play', 'player:command',
+  'player:play', 'player:command', 'player:playlist',
 ]);
 const EVENTS = new Set([
   'catalog:progress', 'catalog:updated', 'epg:progress', 'epg:updated',

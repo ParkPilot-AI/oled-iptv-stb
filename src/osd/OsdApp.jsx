@@ -7,6 +7,7 @@ import { clock, duration, progressPct, epLabel, bitrate } from '../lib/format.js
 import { Icon } from '../components/Icons.jsx';
 import { Screensaver } from '../components/Screensaver.jsx';
 import { usePixelShift } from '../components/Modal.jsx';
+import { useLiveNav, SurfBanner, GlassGuide } from './LiveNav.jsx';
 import './osd.css';
 
 const cmd = (c) => api.invoke('player:command', c).catch(() => {});
@@ -28,6 +29,9 @@ export default function OsdApp() {
   const infoT = useRef(null);
   stRef.current = st;
   usePixelShift(rootRef, 60000);
+  const liveNav = useLiveNav(st, cmd);
+  const navRef = useRef(liveNav);
+  navRef.current = liveNav;
 
   useEffect(() => {
     document.body.classList.add('osd-body');
@@ -104,6 +108,13 @@ export default function OsdApp() {
       const action = keyAction(e);
       if (saver) {
         setSaver(false);
+        return;
+      }
+      // Channel surf / glass guide take ▲▼◀ (and OK/Back while open).
+      if (!digits && navRef.current.handle(action, e)) {
+        clearTimeout(hideT.current);
+        setVisible(false);
+        e.preventDefault?.();
         return;
       }
       const live = s.kind === 'live';
@@ -206,7 +217,16 @@ export default function OsdApp() {
   }, [handle]);
 
   if (!st) return <div className="osd" ref={rootRef} />;
-  if (saver) return <Screensaver />;
+  if (saver) {
+    const it0 = st.item;
+    return (
+      <Screensaver
+        title={it0.seriesName || it0.name}
+        subtitle={it0.kind === 'episode' ? `${epLabel(it0)} · Paused` : 'Paused'}
+        art={it0.seriesIcon || it0.icon}
+      />
+    );
+  }
 
   const it = st.item;
   const showBar = visible || st.paused;
@@ -223,7 +243,9 @@ export default function OsdApp() {
       {note && <div className="osd-note">{note}</div>}
       {showInfo && <StreamInfo st={st} />}
       {visible && <div className="osd-clock">{clock(now)}</div>}
-      {showBar && (st.kind === 'live' ? LiveBanner({ st, epg }) : VodBar({ st }))}
+      {liveNav.surf != null && <SurfBanner nav={liveNav} current={it} />}
+      {liveNav.guide != null && <GlassGuide nav={liveNav} currentIndex={st.index} />}
+      {showBar && !liveNav.active && (st.kind === 'live' ? LiveBanner({ st, epg }) : VodBar({ st }))}
       {st.paused && !visible && (
         <div className="osd-paused">
           <Icon name="pause" size="3rem" />
@@ -267,7 +289,7 @@ export default function OsdApp() {
             </div>
           )}
         </div>
-        <div className="osd-help muted">CH▲▼ zap · 0-9 number · i info · F fav</div>
+        <div className="osd-help muted">▲▼ surf · ◀ guide · CH± zap · 0-9 number · i info · F fav</div>
       </div>
     );
   }

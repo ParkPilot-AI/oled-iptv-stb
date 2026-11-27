@@ -4,6 +4,24 @@
 const WORDS = 'Alpha Bravo Nova Prime Star Sky Ocean Metro City World Sport News Kids Cinema Gold Max Plus One Two Arena Planet Wild Royal Urban Retro Pulse Echo Vision Fusion'.split(' ');
 const rnd = (seed) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
 
+// Generated abstract artwork (original, data: URLs) so the demo looks like a real library.
+const PALETTES = [['#1e3a8a', '#0ea5e9'], ['#7c2d12', '#f59e0b'], ['#064e3b', '#10b981'], ['#4c1d95', '#ec4899'], ['#111827', '#6366f1'], ['#3f1d0b', '#ef4444'], ['#0f172a', '#14b8a6'], ['#312e81', '#a78bfa']];
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function art(seed, w, h, title) {
+  const [a, b] = PALETTES[seed % PALETTES.length];
+  const cx = 20 + ((seed * 37) % 60);
+  const cy = 15 + ((seed * 53) % 50);
+  const words = title ? esc(title.replace(/\s*\(\d{4}\)$/, '')).split(' ') : [];
+  const text = title
+    ? `<text x="${w * 0.08}" y="${h * 0.82}" font-family="Georgia,serif" font-weight="700" font-size="${w * 0.11}" fill="#fff" opacity=".92">${words.slice(0, 2).join(' ')}</text>` +
+      (words.length > 2 ? `<text x="${w * 0.08}" y="${h * 0.82 + w * 0.13}" font-family="Georgia,serif" font-weight="700" font-size="${w * 0.11}" fill="#fff" opacity=".92">${words.slice(2).join(' ')}</text>` : '')
+    : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="#000"/></linearGradient><radialGradient id="r" cx="${cx}%" cy="${cy}%" r="55%"><stop offset="0" stop-color="${b}" stop-opacity=".9"/><stop offset="1" stop-color="${b}" stop-opacity="0"/></radialGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><rect width="100%" height="100%" fill="url(#r)"/><circle cx="${(cx / 100) * w}" cy="${(cy / 100) * h}" r="${Math.min(w, h) * 0.12}" fill="#fff" opacity=".12"/>${text}</svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+const posterArt = (seed, title) => art(seed, 300, 450, title);
+const backdropArt = (seed) => art(seed + 3, 1600, 900, '');
+
 function makeCatalog() {
   const r = rnd(42);
   const pick = (a) => a[Math.floor(r() * a.length)];
@@ -42,6 +60,8 @@ function makeCatalog() {
     added: 1700000000 + i * 7200,
     year: String(2000 + (i % 26)),
   }));
+  vod.forEach((m, i) => (m.icon = posterArt(i, m.name)));
+  series.forEach((m, i) => (m.icon = posterArt(i + 11, m.name)));
   return {
     live: { categories: liveCats, items: live },
     vod: { categories: vodCats, items: vod },
@@ -147,13 +167,14 @@ export function createMockApi() {
     'epg:short': () => [],
     'vod:info': async ({ item }) => {
       await wait(150);
-      return { ...item, plot: 'A gripping demo synopsis that runs for a couple of lines to check wrapping and readability from ten feet away on a large OLED panel.', cast: 'Ada Lovelace, Alan Turing, Grace Hopper', director: 'Demo Director', genre: 'Drama, Thriller', year: '2024', duration: 6420, backdrop: '' };
+      return { ...item, backdrop: item.icon ? backdropArt(item.id) : '', plot: 'A gripping demo synopsis that runs for a couple of lines to check wrapping and readability from ten feet away on a large OLED panel.', cast: 'Ada Lovelace, Alan Turing, Grace Hopper', director: 'Demo Director', genre: 'Drama, Thriller', year: '2024', duration: 6420, backdrop: '' };
     },
     'series:info': async ({ item }) => {
       await wait(150);
       return {
         ...item,
-        plot: 'A demo series synopsis.',
+        backdrop: item.icon ? backdropArt(item.id) : '',
+        plot: 'A demo series synopsis: an ensemble drama following a city over one long, strange year, with the tone shifting from comedy to thriller.',
         cast: 'Demo Cast',
         genre: 'Drama',
         seasons: [1, 2, 3].map((s) => ({
@@ -172,17 +193,24 @@ export function createMockApi() {
       await wait(300);
       setTimeout(() => emit('player:closed', { reason: 'mock', item: args.items[args.index] }), 50);
     },
-    'player:command': (cmd) => console.info('[mock] cmd', cmd),
+    'player:command': (cmd) => {
+      console.info('[mock] cmd', cmd);
+      if (cmd.type === 'jump' && osdDemo) osdDemo.jump(cmd.index);
+      if (cmd.type === 'zap' && osdDemo) osdDemo.jump(osdDemo.index + cmd.delta);
+    },
+    'player:playlist': () => osdDemo?.items ?? [],
   };
 
   // OSD demo mode (#osd in a browser): emit fake playback state.
+  let osdDemo = null;
   if (typeof location !== 'undefined' && location.hash.startsWith('#osd')) {
     const kind = location.hash.includes('vod') ? 'movie' : 'live';
-    const item = kind === 'live'
-      ? { kind, id: 1001, num: 101, name: 'Nova Sport HD', epg: 'ch1', icon: '' }
-      : { kind: 'episode', id: 9, name: 'Episode 3', seriesName: 'Metro Chronicles', season: 1, episode: 3, icon: '' };
+    const names = ['Nova Sport HD', 'Metro News', 'Planet Wild 4K', 'Retro Gold', 'Sky Arena', 'Ocean One', 'Prime Cinema HD', 'Kids Club', 'Echo Music', 'Royal Docs'];
+    const items = Array.from({ length: 50 }, (_, i) => ({ kind: 'live', id: 1001 + i, num: 101 + i, name: `${names[i % names.length]}${i >= 10 ? ` ${Math.floor(i / 10) + 1}` : ''}`, epg: `ch${i + 1}`, icon: '' }));
+    osdDemo = { items, index: 0, jump(i) { this.index = (i + items.length) % items.length; } };
+    const episode = { kind: 'episode', id: 9, name: 'Episode 3', seriesName: 'Metro Chronicles', season: 1, episode: 3, icon: '' };
     let pos = 1234;
-    const st = () => ({ active: true, profileId: 'demo', kind: item.kind, index: 0, total: 50, item, pos, dur: kind === 'live' ? 0 : 2700, paused: false, buffering: false, cacheSecs: 12, info: { width: 3840, height: 2160, vcodec: 'hevc (Main 10)', acodec: 'eac3', channels: '5.1', fps: 50, vbitrate: 18500000, abitrate: 640000, hwdec: 'd3d11va' }, tracks: { audio: [], sub: [] } });
+    const st = () => ({ active: true, profileId: 'demo', kind: kind === 'live' ? 'live' : 'episode', index: osdDemo.index, total: 50, item: kind === 'live' ? items[osdDemo.index] : episode, pos, dur: kind === 'live' ? 0 : 2700, paused: false, buffering: false, cacheSecs: 12, info: { width: 3840, height: 2160, vcodec: 'hevc (Main 10)', acodec: 'eac3', channels: '5.1', fps: 50, vbitrate: 18500000, abitrate: 640000, hwdec: 'd3d11va' }, tracks: { audio: [], sub: [] } });
     setTimeout(() => emit('player:state', st()), 100);
     setInterval(() => {
       pos += 1;

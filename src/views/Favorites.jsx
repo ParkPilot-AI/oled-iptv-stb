@@ -19,12 +19,12 @@ export function Favorites() {
       </Carousel>
       <Carousel title="Movies" group="fav-movies" count={favs.movie.length}>
         {favs.movie.map((m, i) => (
-          <PosterCard key={m.id} item={m} onSelect={() => openItem(m)} autoFocus={!favs.live.length && i === 0} />
+          <PosterCard key={m.id} item={m} caption onSelect={() => openItem(m)} autoFocus={!favs.live.length && i === 0} />
         ))}
       </Carousel>
       <Carousel title="Series" group="fav-series" count={favs.series.length}>
         {favs.series.map((m, i) => (
-          <PosterCard key={m.id} item={m} onSelect={() => openItem(m)} autoFocus={!favs.live.length && !favs.movie.length && i === 0} />
+          <PosterCard key={m.id} item={m} caption onSelect={() => openItem(m)} autoFocus={!favs.live.length && !favs.movie.length && i === 0} />
         ))}
       </Carousel>
     </div>

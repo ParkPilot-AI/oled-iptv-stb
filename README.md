@@ -138,10 +138,10 @@ node test/e2e/mock-xtream.mjs     # 300 channels + EPG + 1 movie + 1 series
 
 | Key | Menus | Playback |
 |---|---|---|
-| Arrows | Move focus | Live: ▲/▼ change channel · VOD: ◀▶ ±10 s (30 s when held), ▲▼ ±60 s |
+| Arrows | Move focus | Live: ▲/▼ channel surf (tunes after 1.8 s or on OK), ◀ glass channel guide over the video · VOD: ◀▶ ±10 s (30 s when held), ▲▼ ±60 s |
 | Enter | Select | Show/hide OSD · confirm a typed channel number |
 | Esc / Backspace | Back one level (Back at the top level asks before exiting) | Close info/OSD, then stop |
-| PageUp / PageDown (ChannelUp/Down) | Page through lists | Next / previous channel or episode |
+| PageUp / PageDown (ChannelUp/Down) | Home & Movies/Series: cycle hub tabs · Live guide: page channels | Next / previous channel or episode (instant) |
 | Space / MediaPlayPause | — | Play/pause |
 | F | Toggle favorite on the focused item | Toggle favorite on the playing item |
 | I | — | Stream info (resolution, codecs, fps, bitrates, HW decoding) |
