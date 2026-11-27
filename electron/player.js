@@ -94,6 +94,7 @@ export class Player {
       profileId: s.profileId,
       osdTimeoutSec: s.settings.osdTimeoutSec,
       screensaverMin: s.settings.screensaverMin,
+      overscan: s.settings.overscan || 0,
       kind: item.kind,
       index: s.index,
       total: s.items.length,

@@ -135,6 +135,7 @@ export const DEFAULT_SETTINGS = {
   screensaverMin: 3,
   startFullscreen: true,
   accent: '#3B82F6',
+  overscan: 0, // per-edge safe margin for TVs that crop the picture
   tmdbKey: '', // free key from themoviedb.org (v3 key or v4 read token)
   artSource: 'missing', // movies/series artwork: missing | prefer | off
   logoSource: 'missing', // channel logos from iptv-org: missing | prefer | off

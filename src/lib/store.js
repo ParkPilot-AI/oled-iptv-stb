@@ -89,6 +89,7 @@ export const confirmDialog = (opts) =>
 export async function boot() {
   const [profiles, settings] = await Promise.all([api.invoke('profiles:list'), api.invoke('settings:get')]);
   applyAccent(settings.accent);
+  applyScreenFit(settings.overscan);
   setState({ profiles, settings });
   if (profiles.activeId && profiles.list.some((p) => p.id === profiles.activeId)) {
     await activateProfile(profiles.activeId);
@@ -97,6 +98,11 @@ export async function boot() {
 
 export function applyAccent(color) {
   document.documentElement.style.setProperty('--accent', color || '#3B82F6');
+}
+
+/** Overscan margin per edge (0, 0.025, 0.05, 0.075) for TVs that crop the picture. */
+export function applyScreenFit(safe) {
+  document.documentElement.style.setProperty('--safe', String(Number(safe) || 0));
 }
 
 export async function refreshProfiles() {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { useStore, setState, getState, toast, confirmDialog, activateProfile, loadEpg, applyAccent, reloadCatalog } from '../lib/store.js';
+import { useStore, setState, getState, toast, confirmDialog, activateProfile, loadEpg, applyAccent, applyScreenFit, reloadCatalog } from '../lib/store.js';
 import { clearArtCache } from '../lib/art.js';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
@@ -15,6 +15,7 @@ const OPTIONS = {
   catalogTtlHours: [[6, 'Every 6 hours'], [12, 'Every 12 hours'], [24, 'Daily'], [168, 'Weekly']],
   epgTtlHours: [[3, 'Every 3 hours'], [6, 'Every 6 hours'], [12, 'Every 12 hours'], [24, 'Daily']],
   startFullscreen: [[true, 'On'], [false, 'Off']],
+  overscan: [[0, 'Full screen'], [0.025, 'Shrink 5%'], [0.05, 'Shrink 10%'], [0.075, 'Shrink 15%']],
   accent: [['#3B82F6', 'Blue'], ['#10B981', 'Emerald'], ['#A78BFA', 'Violet'], ['#F59E0B', 'Amber']],
   artSource: [['missing', 'Fill gaps (provider first)'], ['prefer', 'Prefer TMDB'], ['off', 'Off']],
   logoSource: [['missing', 'Fill gaps (provider first)'], ['prefer', 'Prefer iptv-org'], ['off', 'Off']],
@@ -58,6 +59,7 @@ export function Settings() {
   const update = async (patch) => {
     const s = await api.invoke('settings:update', patch);
     if (patch.accent) applyAccent(patch.accent);
+    if ('overscan' in patch) applyScreenFit(patch.overscan);
     setState({ settings: s });
     if ('artSource' in patch || 'tmdbKey' in patch) clearArtCache();
     if ('logoSource' in patch) reloadCatalog().catch(() => {});
@@ -89,6 +91,7 @@ export function Settings() {
           <Cycle label="Screensaver when paused" k="screensaverMin" settings={settings} update={update} />
           <TextField label="Custom mpv path" value={settings.mpvPath} onChange={(v) => update({ mpvPath: v })} placeholder={info?.mpvPath ? `Using ${info.mpvPath}` : 'mpv not found'} />
           <h2>Display</h2>
+          <Cycle label="Screen fit (if edges are cut off)" k="overscan" settings={settings} update={update} />
           <Cycle label="Accent colour" k="accent" settings={settings} update={update} />
           <Cycle label="Start in fullscreen" k="startFullscreen" settings={settings} update={update} />
           <Action label="Toggle fullscreen now" onSelect={() => api.invoke('app:toggleFullscreen')} />

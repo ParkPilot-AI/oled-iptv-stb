@@ -35,7 +35,10 @@ export default function OsdApp() {
 
   useEffect(() => {
     document.body.classList.add('osd-body');
-    return api.on('player:state', (s) => setSt(s?.active ? s : null));
+    return api.on('player:state', (s) => {
+      if (s?.active) document.documentElement.style.setProperty('--safe', String(Number(s.overscan) || 0));
+      setSt(s?.active ? s : null);
+    });
   }, []);
 
   useEffect(() => {

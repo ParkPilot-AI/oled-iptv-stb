@@ -16,7 +16,12 @@
   --rail-open: 15rem; /* 240 px */
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --ring: 0 0.75rem 2rem rgba(0, 0, 0, 0.85), 0 0 0 2px rgba(234, 234, 234, 0.9);
-  font-size: calc(100vw / 120);
+  /* Screen fit: --safe is the overscan margin per edge (0–0.075). The layout is
+     authored on a 120×67.5 rem (16:9) canvas and scaled to fit BOTH width and
+     height, so nothing is cut off on 16:10 screens, windows or cropping TVs. */
+  --safe: 0;
+  --fit: calc(1 - 2 * var(--safe));
+  font-size: min(calc(100vw * var(--fit) / 120), calc(100vh * var(--fit) / 67.5));
   color-scheme: dark;
 }
 
@@ -98,7 +103,7 @@ small {
 
 .app {
   position: fixed;
-  inset: 0;
+  inset: calc(100vh * var(--safe)) calc(100vw * var(--safe));
   transition: transform 2s linear;
 }
 
@@ -762,7 +767,7 @@ small {
 /* ---------- details ---------- */
 .detail {
   position: fixed;
-  inset: 0;
+  inset: calc(100vh * var(--safe)) calc(100vw * var(--safe));
   z-index: 40;
   background: var(--bg);
 }

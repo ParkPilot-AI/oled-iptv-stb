@@ -7,7 +7,7 @@ html.osd-root #root {
 }
 .osd {
   position: fixed;
-  inset: 0;
+  inset: calc(100vh * var(--safe)) calc(100vw * var(--safe));
   transition: transform 2s linear;
   text-shadow: 0 0.1rem 0.4rem rgba(0, 0, 0, 0.8);
 }
