@@ -5,6 +5,7 @@ import path from 'node:path';
 import fsp from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { profileDir, readJson, writeJson, getCredentials, getSettings } from './store.js';
+import { classifyChannel, homeCountryOf } from './artmatch.js';
 import { apiUrl, fetchJson, normVodInfo, normSeriesInfo, normShortEpg } from './xtream.js';
 import { nowNext, range } from './xmltv.js';
 
@@ -58,16 +59,19 @@ async function withLogos(pid, cat) {
   const mode = (await getSettings()).logoSource || 'missing';
   const lg = memLogos.get(pid) || (await readJson(logosFile(pid), null));
   if (lg) memLogos.set(pid, lg);
-  if (mode === 'off' || !lg?.map) return cat;
-  const map = lg.map;
+  const map = mode === 'off' ? {} : lg?.map || {};
+  const cats = lg?.cats || {};
+  const home = lg?.home || homeCountryOf(cat.live.items);
+  const catName = new Map((cat.live.categories || []).map((c) => [String(c.id), c.name]));
   return {
     ...cat,
     live: {
       ...cat.live,
       items: cat.live.items.map((it) => {
+        const genre = classifyChannel({ name: it.name, catName: catName.get(String(it.cat)) || '', iptvCats: cats[it.id] || [], home });
         const u = map[it.id];
-        if (!u) return it;
-        return mode === 'prefer' || !it.icon ? { ...it, icon: u, providerIcon: it.icon } : it;
+        if (!u) return { ...it, genre };
+        return mode === 'prefer' || !it.icon ? { ...it, genre, icon: u, providerIcon: it.icon } : { ...it, genre };
       }),
     },
   };
@@ -79,7 +83,7 @@ export async function refreshLogos(pid, notify, { force = false } = {}) {
   const cat = memCatalog.get(pid);
   if (!cat) return null;
   const lg = memLogos.get(pid) || (await readJson(logosFile(pid), null));
-  if (!force && lg && Date.now() - lg.fetchedAt < LOGO_TTL && lg.total === cat.live.items.length) return lg;
+  if (!force && lg?.v === 2 && Date.now() - lg.fetchedAt < LOGO_TTL && lg.total === cat.live.items.length) return lg;
   if (logoJobs.has(pid)) return logoJobs.get(pid);
   const job = runJob('logos', { items: cat.live.items.map(({ id, name, epg }) => ({ id, name, epg })) })
     .then(async (res) => {

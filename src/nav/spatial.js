@@ -151,8 +151,11 @@ export function move(dir) {
   const r = cur.getBoundingClientRect();
   let best = null;
   let bestScore = Infinity;
+  const fromSide = !!cur.closest('[data-focus-side]');
   for (const el of pool) {
     if (el === cur) continue;
+    // The side menu is entered with Left only, never by moving up/down the page.
+    if (!fromSide && dir !== 'left' && el.closest('[data-focus-side]')) continue;
     const s = score(r, el.getBoundingClientRect(), dir);
     if (s < bestScore) {
       bestScore = s;

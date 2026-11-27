@@ -11,6 +11,8 @@ mkdir -p /build
 rsync -a --exclude node_modules --exclude dist --exclude release --exclude stb/out --exclude test/e2e/media /app/ /build/app/
 cd /build/app
 if [[ -f package-lock.json ]]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+# Latest list of official channel logos (falls back to the committed snapshot).
+node scripts/update-tvlogos.mjs || echo "tv-logos refresh failed; using snapshot"
 npx vite build
 npx electron-builder --linux dir --publish never
 # Build id lets the in-app updater tell versions apart.

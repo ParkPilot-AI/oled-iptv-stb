@@ -21,6 +21,17 @@ const MAX_AHEAD = 34 * 3600e3; // how far right the window may scroll
 const ROW_REM = 5.4;
 
 const memory = { cat: '__all', row: 0 };
+const GENRES = [
+  ['entertainment', 'Entertainment'],
+  ['documentaries', 'Documentaries'],
+  ['kids', 'Kids'],
+  ['movies', 'Movies'],
+  ['music', 'Music'],
+  ['sports', 'Sports'],
+  ['news', 'News'],
+  ['international', 'International'],
+  ['adult', 'Adult'],
+];
 
 const dayLabel = (t) => {
   const d = new Date(t);
@@ -33,11 +44,31 @@ export function LiveTV() {
   const live = useStore((s) => s.catalog.live);
   const favs = useStore((s) => s.favorites.live);
   const [catId, setCatId] = useState(memory.cat);
-  const channels = useMemo(
-    () => (catId === '__all' ? live.items : catId === '__fav' ? favs : live.byCat.get(catId) || []),
-    [catId, live, favs]
+  // Channels grouped by type (Entertainment, Sports, …), then the provider's own categories.
+  const byGenre = useMemo(() => {
+    const m = new Map();
+    for (const it of live.items) {
+      const g = it.genre || 'entertainment';
+      if (!m.has(g)) m.set(g, []);
+      m.get(g).push(it);
+    }
+    return m;
+  }, [live]);
+  const channels = useMemo(() => {
+    if (catId === '__all') return live.items;
+    if (catId === '__fav') return favs;
+    if (catId.startsWith('g:')) return byGenre.get(catId.slice(2)) || [];
+    return live.byCat.get(catId) || [];
+  }, [catId, live, favs, byGenre]);
+  const cats = useMemo(
+    () => [
+      { id: '__all', name: 'All channels' },
+      { id: '__fav', name: 'Favourites' },
+      ...GENRES.filter(([g]) => byGenre.get(g)?.length).map(([g, name]) => ({ id: `g:${g}`, name, genre: true })),
+      ...live.cats.map((c, i) => (i === 0 ? { ...c, gap: true } : c)),
+    ],
+    [live, byGenre]
   );
-  const cats = useMemo(() => [{ id: '__all', name: 'All channels' }, { id: '__fav', name: 'Favourites' }, ...live.cats], [live]);
 
   // ---- clock / time window ----
   const [now, setNow] = useState(Date.now());
@@ -211,7 +242,7 @@ export function LiveTV() {
         {cats.map((c) => (
           <Focusable
             key={c.id}
-            className={`chip ${c.id === catId ? 'is-active' : ''}`}
+            className={`chip ${c.id === catId ? 'is-active' : ''} ${c.gap ? 'chip-gap' : ''}`}
             data-focus-default={c.id === catId ? '' : undefined}
             onFocus={() => chooseCat(c.id)}
             onSelect={() => {
@@ -346,10 +377,6 @@ function Hero({ channel, prog, now }) {
           </div>
         )}
         {real && prog.desc && <p className="hero-desc">{prog.desc}</p>}
-      </div>
-      <div className="hero-hint muted">
-        OK watch · F favourite
-        <br />◀ ▶ time · ▲ ▼ channel · PgUp/PgDn page
       </div>
     </section>
   );

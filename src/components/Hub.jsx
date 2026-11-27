@@ -148,7 +148,6 @@ export function Hub({ rows, slides, tabs, rowsKey, empty, className = '' }) {
               <i key={`${s.kind}${s.id}`} className={i === slide % slides.length ? 'is-on' : ''} />
             ))}
           </div>
-          {onSpot && <span className="spot-carousel-hint">◀ ▶ more trending</span>}
         </div>
       )}
       <div className="home-rows">
@@ -282,11 +281,6 @@ function Spotlight({ hero, carousel }) {
           </div>
         )}
         {synopsis && <p className="spot-synopsis">{synopsis}</p>}
-        {carousel ? null : (
-        <div className="spot-hint">
-          <Icon name="play" size="1rem" /> OK to {live ? 'watch' : hero.kind === 'cw' || hero.pct ? 'resume' : 'open'} · PgUp/PgDn switch tabs
-        </div>
-        )}
       </div>
     </section>
   );

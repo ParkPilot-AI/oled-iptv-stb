@@ -138,7 +138,7 @@ export const DEFAULT_SETTINGS = {
   overscan: 0, // per-edge safe margin for TVs that crop the picture
   tmdbKey: '', // free key from themoviedb.org (v3 key or v4 read token)
   artSource: 'prefer', // movies/series artwork: prefer (TMDB first) | missing (provider first) | off
-  logoSource: 'missing', // channel logos from iptv-org: missing | prefer | off
+  logoSource: 'prefer', // channel logos: prefer (official logos first) | missing (provider first) | off
   audioDevice: 'auto', // auto | pa:<card>|<profile> (PipeWire) | mpv:<device>
   subMode: 'off', // off | on
   // Picture (mpv video equalizer etc.)
@@ -167,6 +167,10 @@ export async function getSettings() {
   if (!settingsCache) {
     const saved = await readJson(settingsFile(), {});
     // v2 defaults: TMDB artwork first, subtitles off (earlier builds defaulted otherwise).
+    if (!saved.v3) {
+      if (saved.logoSource === 'missing') delete saved.logoSource; // v3: official logos first
+      saved.v3 = true;
+    }
     if (!saved.v2) {
       if (saved.artSource === 'missing') delete saved.artSource;
       if (saved.subMode && saved.subMode !== 'on') delete saved.subMode;

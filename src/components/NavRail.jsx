@@ -23,6 +23,7 @@ export function NavRail({ section, onSelect }) {
       ref={ref}
       className={`rail ${open ? 'is-open' : ''}`}
       data-focus-group="rail"
+      data-focus-side=""
       data-focus-trap="up,down"
       onFocus={() => setOpen(true)}
       onBlur={(e) => !ref.current.contains(e.relatedTarget) && setOpen(false)}

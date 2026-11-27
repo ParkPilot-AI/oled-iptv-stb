@@ -53,10 +53,19 @@ export function pickLogos(logos) {
  */
 export function buildLogoMatcher(channels, logos) {
   const logoBy = pickLogos(logos);
+  const find = buildIptvMatcher(channels, (c) => logoBy.has(c.id));
+  return (item) => {
+    const ch = find(item);
+    return ch ? logoBy.get(ch.id).url : null;
+  };
+}
+
+/** item → iptv-org channel (by EPG id, then name + country). `keep` filters channels. */
+export function buildIptvMatcher(channels, keep = () => true) {
   const byId = new Map();
   const byName = new Map();
   for (const c of channels || []) {
-    if (!c?.id || !logoBy.has(c.id) || c.closed) continue;
+    if (!c?.id || c.closed || !keep(c)) continue;
     byId.set(c.id.toLowerCase(), c);
     for (const n of [c.name, ...(c.alt_names || [])]) {
       const k = normChannelName(n).name;
@@ -77,8 +86,98 @@ export function buildLogoMatcher(channels, logos) {
         ch = (want && list.find((c) => c.country === want)) || (list.length === 1 || !want ? list[0] : null);
       }
     }
-    return ch ? logoBy.get(ch.id).url : null;
+    return ch || null;
   };
+}
+
+// ---------------------------------------------------------------- official logos (tv-logo/tv-logos)
+
+/** ISO-ish country (from the channel prefix) → tv-logos file suffix. */
+const TVL_CC = { GB: 'uk' };
+const tvlCc = (country) => (country ? TVL_CC[country] || country.toLowerCase() : null);
+
+/**
+ * Matcher over the tv-logos index ({ base, folders: { 'countries/united-kingdom': ['bbc-one-uk', …] } }).
+ * File names are "<channel>-<cc>"; "-hz-" marks horizontal variants (used as a fallback).
+ */
+export function buildTvLogoMatcher(index, homeCountry) {
+  const bySlug = new Map();
+  for (const [folder, names] of Object.entries(index?.folders || {})) {
+    for (const n of names) {
+      const parts = n.split('-');
+      if (parts.length < 2) continue;
+      const cc = parts.at(-1);
+      const hz = parts.includes('hz');
+      const slug = parts.slice(0, -1).filter((p) => p !== 'hz').join('');
+      if (!slug) continue;
+      let a = bySlug.get(slug);
+      if (!a) bySlug.set(slug, (a = []));
+      a.push({ cc, hz, url: `${index.base}${folder}/${n}.png` });
+    }
+  }
+  const home = tvlCc(homeCountry);
+  const pick = (list, want) => {
+    const ok = (cc) => list.filter((e) => e.cc === cc).sort((x, y) => x.hz - y.hz)[0];
+    return (want && ok(want)) || (home && ok(home)) || ok('int') || (new Set(list.map((e) => e.cc)).size === 1 ? list.sort((x, y) => x.hz - y.hz)[0] : null);
+  };
+  return (item) => {
+    const { name, country } = normChannelName(item.name);
+    if (!name) return null;
+    const want = tvlCc(country);
+    // "Challenge +1" is "challenge-plus" in tv-logos; "BBC One UK" may carry the country in its name.
+    const keys = [name, name.replace(/plus1$/, 'plus'), name.replace(/(uk|us|tv)$/, ''), name.replace(/^(uk|us)/, ''), `bbc${name}`, /^\d+$/.test(name) ? `channel${name}` : ''];
+    for (const k of new Set(keys)) {
+      const list = k && bySlug.get(k);
+      const hit = list && pick(list, want);
+      if (hit) return hit.url;
+    }
+    return null;
+  };
+}
+
+/** Most common country prefix among the provider's channels (the viewer's "home"). */
+export function homeCountryOf(items) {
+  const n = new Map();
+  for (const it of items || []) {
+    const c = normChannelName(it.name).country;
+    if (c) n.set(c, (n.get(c) || 0) + 1);
+  }
+  return [...n].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+}
+
+// ---------------------------------------------------------------- channel genres
+
+export const GENRES = ['entertainment', 'documentaries', 'kids', 'movies', 'music', 'sports', 'news', 'international', 'adult'];
+const ENGLISH = new Set(['GB', 'US', 'IE', 'CA', 'AU']);
+const RULES = [
+  ['adult', /\b(xxx|adult|18\+|porn|playboy|hustler|brazzers|private|dorcel|redlight|blue hustler)\b/i],
+  ['kids', /\b(kids?|child(ren)?|cartoons?|junior|jr|baby|toons?|cbeebies|cbbc|nick(elodeon|jr|toons)?|disney (channel|jr|junior|xd)|boomerang|pop|tiny pop|cartoonito|ketchup|duck ?tv|kika|gulli)\b/i],
+  ['sports', /\b(sports?|football|soccer|futbol|nba|nfl|nhl|mlb|f1|formula|golf|racing|tennis|cricket|boxing|ufc|wwe|ppv|espn|eurosport|bein|dazn|tnt sport|premier league|la ?liga|serie a|bundesliga|motogp|rugby|darts|snooker|racing tv|sky sports|bt sport|arena sport|supersport)\b/i],
+  ['news', /\b(news|cnn|bbc news|sky news|fox news|msnbc|cnbc|bloomberg|al ?jazeera|euronews|france ?24|dw|rt|gb ?news|newsmax|talk ?tv|parliament|weather)\b/i],
+  ['movies', /\b(movies?|cinema|cine|films?|kino|hbo|showtime|starz|cinemax|tcm|sky (cinema|premiere)|film ?4|great movies|talking pictures|movies ?24|paramount ?network)\b/i],
+  ['music', /\b(music|musique|mtv|vh1|kiss|4music|clubland|kerrang|box hits|the box|magic|capital|radio|hits|vevo|trace|now (70|80|90|rock)s?|stingray)\b/i],
+  ['documentaries', /\b(docs?|documentar(y|ies)|discovery|nat ?geo|national geographic|history|animal planet|science|investigation|crime ?\+ ?investigation|yesterday|smithsonian|curiosity|pbs|nature|wild|viasat (explore|history|nature)|blaze|quest)\b/i],
+];
+const IPTV_ORG = {
+  xxx: 'adult', kids: 'kids', animation: 'kids', sports: 'sports', news: 'news', weather: 'news', movies: 'movies', music: 'music',
+  documentary: 'documentaries', science: 'documentaries', education: 'documentaries', outdoor: 'documentaries', travel: 'documentaries',
+};
+
+/**
+ * One genre per channel. Order: adult → provider category / channel name keywords →
+ * iptv-org categories → International (foreign-language country) → Entertainment.
+ */
+export function classifyChannel({ name = '', catName = '', iptvCats = [], home = null }) {
+  const text = `${catName} | ${name}`;
+  if (RULES[0][1].test(text) || iptvCats.includes('xxx')) return 'adult';
+  // The provider's category is the strongest signal ("UK | Sports"), then the channel name.
+  for (const src of [catName, name]) for (const [g, re] of RULES.slice(1)) if (re.test(src)) return g;
+  for (const c of iptvCats) if (IPTV_ORG[c]) return IPTV_ORG[c];
+  const country = normChannelName(name).country || normChannelName(catName).country;
+  const homeLang = home ? ENGLISH.has(home) : true;
+  if (country && country !== home && !(homeLang && ENGLISH.has(country))) return 'international';
+  if (/\b(international|world|foreign|arabic|turkish|polish|india[n]?|african|latino|asian|kurdish|persian|russian|portug|span|italia|french|german|greek|albania|ex-?yu|balkan|romania|bulgaria)\b/i.test(catName)) return 'international';
+  return 'entertainment';
 }
 
 /** "EN - The Matrix (1999) [4K]" → { title: 'The Matrix', year: '1999' } */

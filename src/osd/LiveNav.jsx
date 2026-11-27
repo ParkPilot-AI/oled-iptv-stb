@@ -190,7 +190,6 @@ export function SurfBanner({ nav, current }) {
       </div>
       <div className="surf-side">
         <span className="muted">Now watching {current?.num ? `${current.num} ` : ''}{current?.name}</span>
-        <span>OK watch now · Back cancel</span>
         <div className="surf-timer" key={nav.surf}>
           <div />
         </div>
@@ -242,7 +241,6 @@ export function GlassGuide({ nav, currentIndex }) {
           );
         })}
       </div>
-      <div className="gg-foot muted">▲▼ browse · OK watch · ▶ / Back close</div>
     </div>
   );
 }

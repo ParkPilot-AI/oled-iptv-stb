@@ -191,7 +191,8 @@ small {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: var(--rail);
+  /* A clear gap after the side menu so zoomed cards never tuck under it. */
+  left: calc(var(--rail) + 1rem);
   right: 0;
   padding: 2.2rem 2.5rem 0 2rem;
   overflow: clip;
@@ -1674,7 +1675,8 @@ small {
   min-height: 0;
 }
 .library2 .lib-grid .vcell {
-  padding: 1rem 0.65rem 0.4rem;
+  /* Room for the 8% focus zoom so the grid's edges never clip a card. */
+  padding: 1.1rem 1rem 0.5rem;
 }
 
 /* ---------- LIVE badge ---------- */
@@ -2027,4 +2029,26 @@ small {
 .library2.is-hub > .home2 {
   position: absolute;
   inset: 0;
+}
+
+/* Guide: a little space between channel types and the provider's own categories. */
+.chip-gap {
+  margin-left: 1.6rem;
+}
+
+/* Rows run edge to edge so cards scrolled to the left fade out gently instead of
+   being cut off next to the side menu; the first card keeps its gutter. */
+.home-rows-inner {
+  padding-left: 0;
+}
+.home-rows .carousel h2,
+.home-rows .empty {
+  margin-left: 2.8rem;
+}
+.home-rows .carousel-track {
+  padding-left: 3rem;
+}
+.home-rows .carousel-viewport {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 2.4rem);
+  mask-image: linear-gradient(to right, transparent 0, #000 2.4rem);
 }

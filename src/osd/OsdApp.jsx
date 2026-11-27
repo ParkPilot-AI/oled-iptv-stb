@@ -299,7 +299,6 @@ export default function OsdApp() {
             </div>
           )}
         </div>
-        <div className="osd-help muted">▲▼ surf · ◀ guide · CH± zap · 0-9 number · i info · F fav</div>
       </div>
     );
   }
@@ -326,7 +325,6 @@ export default function OsdApp() {
             <span>{duration(st.dur)}</span>
           </div>
         </div>
-        <div className="osd-help muted">◀▶ 10s · ▲▼ 1 min · Space pause · A audio · S subs · i info</div>
       </div>
     );
   }

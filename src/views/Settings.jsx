@@ -22,7 +22,7 @@ const OPTIONS = {
   overscan: [[0, 'Full screen'], [0.025, 'Shrink 5%'], [0.05, 'Shrink 10%'], [0.075, 'Shrink 15%']],
   accent: [['#3B82F6', 'Blue'], ['#DC143C', 'Crimson'], ['#10B981', 'Emerald'], ['#A78BFA', 'Violet'], ['#F59E0B', 'Amber']],
   artSource: [['prefer', 'TMDB first (recommended)'], ['missing', 'Provider first, TMDB for gaps'], ['off', 'Off']],
-  logoSource: [['missing', 'Fill gaps (provider first)'], ['prefer', 'Prefer iptv-org'], ['off', 'Off']],
+  logoSource: [['prefer', 'Official logos (recommended)'], ['missing', 'Provider first'], ['off', 'Provider logos only']],
   subMode: [['off', 'Off'], ['on', 'On']],
   aspect: [['auto', 'Original'], ['16:9', '16:9'], ['4:3', '4:3'], ['21:9', 'Cinema 21:9'], ['zoom', 'Zoom to fill'], ['stretch', 'Stretch to fill']],
   upscaling: [['standard', 'Standard'], ['high', 'High quality (more GPU)'], ['fast', 'Fast (weak PCs)']],
@@ -205,7 +205,6 @@ export function Settings() {
           <Slider label="Contrast" k="contrast" settings={settings} update={update} />
           <Slider label="Colour" k="saturation" settings={settings} update={update} />
           <Slider label="Gamma" k="gamma" settings={settings} update={update} />
-          <p className="settings-hint">◀ ▶ to adjust · OK to reset a slider</p>
           <Action label="Reset picture settings" onSelect={() => update(PICTURE_RESET).then(() => toast('Picture settings reset'))} />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
@@ -226,14 +225,12 @@ export function Settings() {
           <AudioOutputRow settings={settings} update={update} />
           {C('Speakers', 'speakers')}
           {C('Dolby / DTS passthrough', 'passthrough')}
-          <p className="settings-hint">Use Volume Up / Down / Mute on your remote or keyboard to change the volume.</p>
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
           <h2>Listening</h2>
           {C('Audio language', 'audioLang')}
           {C('Volume levelling', 'nightMode')}
           <Slider label="Lip-sync delay" k="audioDelayMs" settings={settings} update={update} min={-500} max={500} step={25} format={ms} />
-          <p className="settings-hint">If voices come before lips move, increase the delay. Press A during playback to switch audio track.</p>
         </div>
       </>
     ),
@@ -243,7 +240,6 @@ export function Settings() {
           <h2>Subtitles</h2>
           <Toggle label="Subtitles" on={settings.subMode === 'on'} onChange={(on) => update({ subMode: on ? 'on' : 'off' })} />
           {C('Preferred language', 'subLang')}
-          <p className="settings-hint">Press S during playback to switch subtitle track or turn them off.</p>
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
           <h2>Appearance</h2>
@@ -287,7 +283,7 @@ export function Settings() {
             }}
           />
           <p className="credits-note">
-            Movie and TV artwork from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Channel logos from the iptv-org open database.
+            Movie and TV artwork from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Channel logos from tv-logo/tv-logos (github.com/tv-logo/tv-logos, for personal use) and the iptv-org open database.
           </p>
         </div>
       </>

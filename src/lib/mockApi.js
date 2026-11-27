@@ -1,3 +1,4 @@
+import { classifyChannel } from '../../electron/artmatch.js';
 // Demo backend for browser-only development and automated UI tests.
 // Generates a large catalog (10k channels) to exercise virtualisation.
 
@@ -52,6 +53,7 @@ function makeCatalog() {
     epg: `ch${i}`,
     archive: false,
   }));
+  live.forEach((c) => (c.genre = classifyChannel({ name: c.name, catName: liveCats[Number(c.cat) - 1].name, home: 'GB' })));
   const vodCats = ['Action', 'Comedy', 'Drama', 'Sci-Fi', 'Horror', 'Family', 'Documentary', '4K Movies'].map((name, i) => ({ id: String(100 + i), name }));
   const vod = Array.from({ length: 3000 }, (_, i) => ({
     kind: 'movie',

@@ -12,28 +12,43 @@ import {
   normSeries,
 } from '../xtream.js';
 import { createXmltvParser, createEpgCollector } from '../xmltv.js';
-import { buildLogoMatcher } from '../artmatch.js';
+import fs from 'node:fs';
+import { buildIptvMatcher, buildTvLogoMatcher, homeCountryOf, pickLogos } from '../artmatch.js';
 
 const IPTV_ORG = process.env.IPTV_ORG_API || 'https://iptv-org.github.io/api';
 
-/** Match provider channels to iptv-org logos. items: [{id, name, epg}] → { [id]: url } */
+/**
+ * Channel logos and genre hints. Logos: official 512 px PNGs from tv-logo/tv-logos
+ * first, then iptv-org. Genre hints: the iptv-org channel categories.
+ * items: [{id, name, epg}] → { map: {id: url}, cats: {id: [..]}, home, … }
+ */
 async function matchLogos(items, post) {
   post({ stage: 'logos' });
+  let tvl = null;
+  try {
+    tvl = JSON.parse(fs.readFileSync(new URL('../data/tvlogos.json', import.meta.url), 'utf8'));
+  } catch {}
   const [channels, logos] = await Promise.all([
-    fetchJson(`${IPTV_ORG}/channels.json`, { timeoutMs: 120000 }),
-    fetchJson(`${IPTV_ORG}/logos.json`, { timeoutMs: 120000 }),
+    fetchJson(`${IPTV_ORG}/channels.json`, { timeoutMs: 120000 }).catch(() => []),
+    fetchJson(`${IPTV_ORG}/logos.json`, { timeoutMs: 120000 }).catch(() => []),
   ]);
-  const match = buildLogoMatcher(channels, logos);
+  const home = homeCountryOf(items);
+  const official = tvl ? buildTvLogoMatcher(tvl, home) : () => null;
+  const iptv = buildIptvMatcher(channels);
+  const logoBy = pickLogos(logos);
   const map = {};
+  const cats = {};
   let hits = 0;
   for (const it of items) {
-    const url = match(it);
+    const ch = iptv(it);
+    const url = official(it) || (ch && logoBy.get(ch.id)?.url) || null;
     if (url) {
       map[it.id] = url;
       hits++;
     }
+    if (ch?.categories?.length) cats[it.id] = ch.categories;
   }
-  return { map, hits, total: items.length, fetchedAt: Date.now() };
+  return { v: 2, map, cats, home, hits, total: items.length, fetchedAt: Date.now() };
 }
 
 async function loadCatalog(creds, post) {

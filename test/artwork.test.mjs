@@ -74,3 +74,35 @@ test('provider prefixes are stripped without eating real titles', async () => {
   assert.equal(t('X-Men: Days of Future Past'), 'X-Men: Days of Future Past');
   assert.equal(t('CSI: Vegas'), 'CSI: Vegas');
 });
+
+test('official logos: country-aware, +1 and alias handling', async () => {
+  const { buildTvLogoMatcher } = await import('../electron/artmatch.js');
+  const idx = {
+    base: 'https://x/',
+    folders: {
+      'countries/united-kingdom': ['bbc-one-uk', 'channel-4-plus-uk', 'channel-4-uk', 'bbc-cbeebies-uk', 'channel-5-uk', 'espn-uk', 'sky-news-hz-uk'],
+      'countries/united-states': ['espn-us'],
+    },
+  };
+  const f = buildTvLogoMatcher(idx, 'GB');
+  assert.equal(f({ name: 'UK: BBC One HD' }), 'https://x/countries/united-kingdom/bbc-one-uk.png');
+  assert.equal(f({ name: 'UK| Channel 4 +1' }), 'https://x/countries/united-kingdom/channel-4-plus-uk.png');
+  assert.equal(f({ name: 'UK: CBeebies' }), 'https://x/countries/united-kingdom/bbc-cbeebies-uk.png');
+  assert.equal(f({ name: 'UK: 5' }), 'https://x/countries/united-kingdom/channel-5-uk.png');
+  assert.equal(f({ name: 'US: ESPN' }), 'https://x/countries/united-states/espn-us.png');
+  assert.equal(f({ name: 'ESPN' }), 'https://x/countries/united-kingdom/espn-uk.png'); // home country
+  assert.equal(f({ name: 'UK: Sky News' }), 'https://x/countries/united-kingdom/sky-news-hz-uk.png');
+  assert.equal(f({ name: 'Nothing Like It' }), null);
+});
+
+test('channel genres', async () => {
+  const { classifyChannel: c } = await import('../electron/artmatch.js');
+  assert.equal(c({ name: 'UK: Sky Sports Main Event', catName: 'UK | Sports', home: 'GB' }), 'sports');
+  assert.equal(c({ name: 'UK: Something', catName: 'UK | Kids', home: 'GB' }), 'kids');
+  assert.equal(c({ name: 'UK: CNN', catName: 'UK | General', home: 'GB' }), 'news');
+  assert.equal(c({ name: 'UK: Dave', catName: 'UK | General', home: 'GB' }), 'entertainment');
+  assert.equal(c({ name: 'FR: TF1', catName: 'France', home: 'GB' }), 'international');
+  assert.equal(c({ name: 'US: AMC', catName: 'USA', home: 'GB' }), 'entertainment'); // English-language
+  assert.equal(c({ name: 'Mystery', catName: 'Adult 18+', home: 'GB' }), 'adult');
+  assert.equal(c({ name: 'Channel X', catName: 'Misc', iptvCats: ['documentary'], home: 'GB' }), 'documentaries');
+});

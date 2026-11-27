@@ -22,7 +22,6 @@ export function Search() {
       <div className="search-left">
         <h1>Search</h1>
         <VirtualKeyboard value={q} onChange={setQ} placeholder="Type to search…" group="search-kb" active={!detailOpen} />
-        <p className="hint">Type on a keyboard or use the on-screen keys</p>
       </div>
       <div className="search-results">
         {!res && <p className="empty big">Channels, movies and series appear here as you type.</p>}
