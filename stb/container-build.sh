@@ -7,6 +7,7 @@ echo "==> Installing build tools"
 pacman -Syu --noconfirm --needed archiso nodejs npm git rsync zstd
 
 echo "==> Building the app"
+mkdir -p /build
 rsync -a --exclude node_modules --exclude dist --exclude release --exclude stb/out --exclude test/e2e/media /app/ /build/app/
 cd /build/app
 if [[ -f package-lock.json ]]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
