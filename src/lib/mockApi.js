@@ -130,7 +130,7 @@ export function createMockApi() {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const handlers = {
-    'app:info': () => ({ version: '1.0.0-web', platform: 'web', mpvPath: null, dataDir: '(browser)' }),
+    'app:info': () => ({ version: '1.0.0-web', platform: 'web', mpvPath: null, dataDir: '(browser)', build: '2026.11.27-a0acc2f', updater: true }),
     'app:quit': () => emit('mock:quit'),
     'app:toggleFullscreen': () => document.documentElement.requestFullscreen?.(),
     'profiles:list': () => ({ ...profiles, secureStorage: false }),
@@ -200,6 +200,32 @@ export function createMockApi() {
       };
     },
     'cache:clear': () => (catalog = null),
+    'app:restart': () => setTimeout(() => location.reload(), 300),
+    'system:update:check': async () => {
+      await wait(700);
+      return { available: true, system: 42, appInstalled: '2026.11.27-a0acc2f', appLatest: '2026.11.27-c4e91b2', repo: 'ParkPilot-AI/oled-iptv-stb', hasToken: true };
+    },
+    'system:update:run': () => {
+      const steps = [
+        [300, { type: 'step', text: 'Refreshing package signing keys' }],
+        [900, { type: 'line', text: ':: Synchronizing package databases...' }],
+        [1300, { type: 'line', text: ' core downloading...' }],
+        [1700, { type: 'step', text: 'Updating system packages' }],
+        [2200, { type: 'line', text: ':: Starting full system upgrade...' }],
+        [2700, { type: 'line', text: '(1/42) upgrading linux                        [####################] 100%' }],
+        [3300, { type: 'line', text: '(17/42) upgrading mesa                        [####################] 100%' }],
+        [3900, { type: 'line', text: '(42/42) upgrading mpv                         [####################] 100%' }],
+        [4400, { type: 'step', text: 'Downloading app 2026.11.27-c4e91b2' }],
+        [5200, { type: 'step', text: 'Installing app 2026.11.27-c4e91b2' }],
+        [5600, { type: 'app', text: '2026.11.27-c4e91b2' }],
+        [5700, { type: 'reboot' }],
+        [5800, { type: 'done' }],
+        [5900, { type: 'exit', code: 0 }],
+      ];
+      for (const [ms, ev] of steps) setTimeout(() => emit('system:update:progress', ev), ms);
+      return { started: true };
+    },
+    'system:reboot': () => setTimeout(() => location.reload(), 500),
     'art:get': (q) => (settings.tmdbKey ? { poster: null, backdrop: backdropArt(q.id), logo: titleLogo(q.name), overview: null } : null),
     'art:testKey': async (key) => {
       await wait(300);

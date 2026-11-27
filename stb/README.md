@@ -61,9 +61,27 @@ If anything fails, the error is shown along with the log at `/root/stb-install.l
 | Change Wi-Fi | `iwctl station wlan0 connect "NewNetwork"` |
 | Keep audio on the headphone jack | `echo STB_AUDIO=analog | sudo tee -a /etc/environment` |
 | Logs | `/tmp/oled-iptv.log` (app), `/tmp/xsession.log` (X) |
-| Update the app | On your PC: `npm run dist:linux`. Copy `release/linux-unpacked/` to the box and replace `/opt/oled-iptv` (keep `chrome-sandbox` as root, mode 4755) |
+| Update everything | **Settings → System → Update system**. One button updates the Arch packages (`pacman -Syu`) and the OLED IPTV app (from the newest GitHub release, checksum-verified, old version kept in `/opt/oled-iptv.old`). The app then restarts; a reboot is offered if a new kernel was installed. Log: `/var/log/stb-update.log` |
 | Check hardware decoding | Press **I** while playing. *HW decoding* should say `vaapi` |
 
-## 5. Status
+## 5. One-button updates
+
+The installer sets up three things:
+
+* `/usr/local/sbin/stb-update` — a small root helper (`check`, `run`, `reboot`).
+* `/etc/sudoers.d/20-stb-update` — lets the `tv` user run **only** that helper as root, without a password.
+* `/etc/stb/update.conf` — where app builds come from: `REPO="owner/repo"`, and `GITHUB_TOKEN=""` if the repo is private. Use a fine-grained token with *Contents: read-only* on that one repo.
+
+Every push to `main` builds a release with the installer ISO, `oled-iptv-app.tar.zst`, `app-version.txt` and `SHA256SUMS`. The updater compares `app-version.txt` with `/opt/oled-iptv/stb-version.txt`.
+
+**A box installed from an older ISO** (before the updater existed): reinstall from a newer ISO, or from the maintenance shell copy `stb/overlay/airootfs/root/stb-files/stb-update` to `/usr/local/sbin/`, then create the sudoers file and config shown above:
+```bash
+sudo pacman -S --needed pacman-contrib jq
+sudo install -m755 stb-update /usr/local/sbin/stb-update
+echo 'tv ALL=(root) NOPASSWD: /usr/local/sbin/stb-update' | sudo tee /etc/sudoers.d/20-stb-update && sudo chmod 440 /etc/sudoers.d/20-stb-update
+printf 'REPO="ParkPilot-AI/oled-iptv-stb"\nGITHUB_TOKEN="<token>"\n' | sudo install -Dm600 /dev/stdin /etc/stb/update.conf
+```
+
+## 6. Status
 
 The scripts pass lint checks and the app build steps are the same ones I tested elsewhere. **The ISO build and the install itself have not been run yet**, because Arch package mirrors aren't reachable from the environment where this kit was written. Expect to need a small fix or two on first use. The log file shows exactly where anything stopped.

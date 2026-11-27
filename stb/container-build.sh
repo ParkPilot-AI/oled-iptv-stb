@@ -13,13 +13,20 @@ cd /build/app
 if [[ -f package-lock.json ]]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
 npx vite build
 npx electron-builder --linux dir --publish never
+# Build id lets the in-app updater tell versions apart.
+BUILD_ID=${BUILD_ID:-$(date -u +%Y.%m.%d-%H%M)}
+echo "$BUILD_ID" > release/linux-unpacked/stb-version.txt
 # Tarball keeps executable bits/setuid layout (archiso resets modes of airootfs files).
 mkdir -p /build/payload
 tar -C release/linux-unpacked -I 'zstd -19 -T0' -cf /build/payload/oled-iptv.tar.zst .
+# Also publish the app on its own for one-button updates on installed boxes.
+cp /build/payload/oled-iptv.tar.zst /out/oled-iptv-app.tar.zst
+echo "$BUILD_ID" > /out/app-version.txt
 
 echo "==> Preparing archiso profile"
 cp -r /usr/share/archiso/configs/releng /build/profile
 rsync -a /kit/overlay/ /build/profile/
+echo "${STB_REPO:-}" > /build/profile/airootfs/root/stb-files/update-repo
 mkdir -p /build/profile/airootfs/opt/stb-payload
 cp /build/payload/oled-iptv.tar.zst /build/profile/airootfs/opt/stb-payload/
 
@@ -46,4 +53,4 @@ EOF
 
 echo "==> Building ISO"
 mkarchiso -v -w /build/work -o /out /build/profile
-chown "${HOST_UID:-0}:${HOST_GID:-0}" /out/*.iso
+chown "${HOST_UID:-0}:${HOST_GID:-0}" /out/*

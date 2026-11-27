@@ -7,6 +7,8 @@
 //             that receives every key press during playback.
 import { app, BrowserWindow, ipcMain, Menu, screen, powerSaveBlocker, shell } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
+import { spawn, execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import * as store from './store.js';
 import * as catalog from './catalog.js';
@@ -100,6 +102,57 @@ function createOsdWindow() {
   loadRenderer(osdWin, 'osd');
 }
 
+// ---------- one-button system updates (set-top box image only) ----------
+const UPDATER = '/usr/local/sbin/stb-update';
+const hasUpdater = () => process.platform === 'linux' && fs.existsSync(UPDATER);
+let updateProc = null;
+
+function checkUpdates() {
+  return new Promise((resolve) => {
+    if (!hasUpdater()) return resolve({ available: false });
+    execFile('sudo', ['-n', UPDATER, 'check'], { timeout: 90000 }, (err, out, errOut) => {
+      if (err) return resolve({ available: true, error: String(errOut || err.message).trim().split('\n').pop() });
+      try {
+        resolve({ available: true, ...JSON.parse(String(out).trim().split('\n').pop()) });
+      } catch {
+        resolve({ available: true, error: 'Unexpected response from the updater' });
+      }
+    });
+  });
+}
+
+function runUpdate() {
+  if (!hasUpdater()) throw new Error('Updates are only available on the set-top box image');
+  if (updateProc) return { started: false, running: true };
+  const p = spawn('sudo', ['-n', UPDATER, 'run'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  updateProc = p;
+  let buf = '';
+  const emit = (ev) => sendMain('system:update:progress', ev);
+  const onData = (d) => {
+    buf += d;
+    let i;
+    while ((i = buf.indexOf('\n')) !== -1) {
+      const line = buf.slice(0, i).replace(/\x1b\[[0-9;]*m/g, '');
+      buf = buf.slice(i + 1);
+      if (!line.trim()) continue;
+      const m = /^@@ (\w+)\s*(.*)$/.exec(line);
+      if (!m) emit({ type: 'line', text: line.slice(0, 300) });
+      else if (m[1] === 'STEP') emit({ type: 'step', text: m[2] });
+      else if (m[1] === 'APP_UPDATED') emit({ type: 'app', text: m[2] });
+      else if (m[1] === 'REBOOT_REQUIRED') emit({ type: 'reboot' });
+      else if (m[1] === 'ERROR') emit({ type: 'error', text: m[2] });
+      else if (m[1] === 'DONE') emit({ type: 'done' });
+    }
+  };
+  p.stdout.on('data', onData);
+  p.stderr.on('data', onData);
+  p.on('close', (code) => {
+    updateProc = null;
+    emit({ type: 'exit', code });
+  });
+  return { started: true };
+}
+
 function sendMain(channel, data) {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(channel, data);
 }
@@ -145,10 +198,30 @@ const handlers = {
       version: app.getVersion(),
       platform: process.platform,
       mpvPath: resolveMpvBinary({ customPath: s.mpvPath, resourcesPath: process.resourcesPath }),
+      build: (() => {
+        try {
+          return fs.readFileSync(path.join(path.dirname(process.execPath), 'stb-version.txt'), 'utf8').trim();
+        } catch {
+          return null;
+        }
+      })(),
+      updater: hasUpdater(),
       dataDir: store.dataDir(),
     };
   },
   'app:quit': () => app.quit(),
+  'app:restart': () => {
+    // On the set-top box an autostart loop relaunches the app; elsewhere relaunch ourselves.
+    if (!hasUpdater()) app.relaunch();
+    setTimeout(() => app.quit(), 200);
+  },
+  'system:update:check': () => checkUpdates(),
+  'system:update:run': () => runUpdate(),
+  'system:reboot': () => {
+    if (!hasUpdater()) throw new Error('Not available on this system');
+    store.flushDocs();
+    spawn('sudo', ['-n', UPDATER, 'reboot'], { detached: true, stdio: 'ignore' }).unref();
+  },
   'app:toggleFullscreen': () => mainWin?.setFullScreen(!mainWin.isFullScreen()),
 
   'profiles:list': () => store.listProfiles(),

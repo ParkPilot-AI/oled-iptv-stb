@@ -4,6 +4,7 @@ import { useStore, setState, getState, toast, confirmDialog, activateProfile, lo
 import { clearArtCache } from '../lib/art.js';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
+import { UpdateRow } from '../components/SystemUpdate.jsx';
 
 const OPTIONS = {
   liveFormat: [['ts', 'MPEG-TS (.ts) — lowest latency'], ['m3u8', 'HLS (.m3u8)']],
@@ -93,6 +94,12 @@ export function Settings() {
           <Action label="Toggle fullscreen now" onSelect={() => api.invoke('app:toggleFullscreen')} />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="up,down">
+          {info?.updater && (
+            <>
+              <h2>System</h2>
+              <UpdateRow />
+            </>
+          )}
           <h2>Playlist · {profile?.name}</h2>
           <Action label="Switch or edit playlists" onSelect={() => setState({ boot: 'login' })} />
           <Action
@@ -129,7 +136,7 @@ export function Settings() {
             }}
           />
           <h2>About</h2>
-          <Action label="Version" value={info ? `${info.version} · ${info.platform}` : ''} onSelect={() => {}} />
+          <Action label="Version" value={info ? `${info.version}${info.build ? ` · build ${info.build}` : ''} · ${info.platform}` : ''} onSelect={() => {}} />
           <Action label="mpv" value={info?.mpvPath || 'Not found — see README'} onSelect={() => {}} />
           <p className="credits-note">
             Movie and TV artwork from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.

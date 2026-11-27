@@ -97,6 +97,15 @@ TZ_=$(ask "Time zone [Europe/London]: "); TZ_=${TZ_:-Europe/London}
 [[ -f /usr/share/zoneinfo/$TZ_ ]] || { warn "Unknown time zone, using Europe/London"; TZ_=Europe/London; }
 KB=$(ask "Keyboard layout [gb]: "); KB=${KB:-gb}
 HOST=$(ask "Box name on the network [iptv-box]: "); HOST=${HOST:-iptv-box}
+DEFAULT_REPO=$(cat /root/stb-files/update-repo 2>/dev/null)
+echo
+echo "One-button updates download new app builds from a GitHub repository."
+UPD_REPO=$(ask "GitHub repo for app updates [${DEFAULT_REPO:-none}]: "); UPD_REPO=${UPD_REPO:-$DEFAULT_REPO}
+UPD_TOKEN=""
+if [[ -n $UPD_REPO ]]; then
+  echo "If that repo is PRIVATE, paste a read-only GitHub token (fine-grained, Contents: read)."
+  read -r -s -p "GitHub token (Enter to skip): " UPD_TOKEN; echo
+fi
 echo "A maintenance login 'tv' is created (Ctrl+Alt+F2 on the box)."
 while true; do
   read -r -s -p "Choose a password for user 'tv': " PW1; echo
@@ -131,6 +140,7 @@ PKGS=(
   pipewire pipewire-pulse pipewire-alsa wireplumber libpulse alsa-utils
   gtk3 nss alsa-lib libcups libxss libxtst at-spi2-core libdrm libxkbcommon libsecret
   noto-fonts ttf-dejavu
+  pacman-contrib jq curl
 )
 pacstrap -K "$MNT" "${PKGS[@]}" || die "pacstrap failed (network or mirror problem). Re-run to retry."
 
@@ -138,6 +148,7 @@ pacstrap -K "$MNT" "${PKGS[@]}" || die "pacstrap failed (network or mirror probl
 say "Installing OLED IPTV"
 mkdir -p "$MNT/opt/oled-iptv"
 tar -C "$MNT/opt/oled-iptv" -I zstd -xf "$PAYLOAD" || die "Could not unpack the app"
+chown -R root:root "$MNT/opt/oled-iptv"
 chown root:root "$MNT/opt/oled-iptv/chrome-sandbox" && chmod 4755 "$MNT/opt/oled-iptv/chrome-sandbox"
 ln -sf /opt/oled-iptv/oled-iptv-player "$MNT/usr/local/bin/oled-iptv-player"
 
@@ -209,6 +220,17 @@ install -Dm755 "$FILES/openbox-autostart" "$H/.config/openbox/autostart"
 install -Dm644 "$FILES/openbox-rc.xml" "$H/.config/openbox/rc.xml"
 install -Dm644 "$FILES/picom.conf" "$H/.config/picom/picom.conf"
 install -Dm755 "$FILES/stb-audio.sh" "$MNT/usr/local/bin/stb-audio"
+
+# One-button updater: root helper, a sudo rule that allows only it, and its config.
+install -Dm755 -o root -g root "$FILES/stb-update" "$MNT/usr/local/sbin/stb-update"
+install -Dm440 /dev/stdin "$MNT/etc/sudoers.d/20-stb-update" <<'SUDO'
+tv ALL=(root) NOPASSWD: /usr/local/sbin/stb-update
+SUDO
+install -Dm600 /dev/stdin "$MNT/etc/stb/update.conf" <<CONF
+# Used by /usr/local/sbin/stb-update (Settings → Update system).
+REPO="$UPD_REPO"
+GITHUB_TOKEN="$UPD_TOKEN"
+CONF
 touch "$H/.hushlogin"
 arch-chroot "$MNT" chown -R tv:tv /home/tv
 

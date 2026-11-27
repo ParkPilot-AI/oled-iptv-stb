@@ -24,6 +24,7 @@ echo "==> Building inside an Arch Linux container (needs internet, ~15 min)…"
 docker pull archlinux:latest
 docker run --rm --privileged \
   -e HOST_UID="${SUDO_UID:-$(id -u)}" -e HOST_GID="${SUDO_GID:-$(id -g)}" \
+  -e BUILD_ID="${BUILD_ID:-}" -e STB_REPO="${STB_REPO:-${GITHUB_REPOSITORY:-}}" \
   -v "$KIT":/kit:ro -v "$APP":/app:ro -v "$OUT":/out \
   archlinux:latest bash /kit/container-build.sh
 
@@ -32,7 +33,7 @@ chown -R "${SUDO_UID:-$(id -u)}:${SUDO_GID:-$(id -g)}" "$OUT"
 
 echo
 echo "==> Done:"
-ls -lh "$OUT"/*.iso
+ls -lh "$OUT"
 cat <<'EOF'
 
 Write it to a USB stick (replace sdX with your stick — check with `lsblk`!):

@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+# OLED IPTV set-top box updater (runs as root via a narrow sudoers rule).
+#   stb-update check   → one JSON line: pending system updates + app versions
+#   stb-update run     → update Arch packages, then the app; progress on stdout
+#   stb-update reboot  → reboot the box
+# Progress protocol: lines starting with "@@ " are machine-readable
+#   @@ STEP <text> | @@ APP_UPDATED <version> | @@ REBOOT_REQUIRED | @@ DONE | @@ ERROR <text>
+set -uo pipefail
+# (sudo resets the environment, so the STB_* overrides below only work in tests.)
+export LC_ALL=C PATH=${STB_PATH_PREFIX:+$STB_PATH_PREFIX:}/usr/local/sbin:/usr/local/bin:/usr/bin
+
+CONF=/etc/stb/update.conf
+REPO=""
+GITHUB_TOKEN=""
+# shellcheck source=/dev/null
+[[ -r $CONF ]] && . "$CONF"
+APP=${STB_APP_DIR:-/opt/oled-iptv}
+API=${STB_GITHUB_API:-https://api.github.com}
+LOG=${STB_UPDATE_LOG:-/var/log/stb-update.log}
+LOCK=${STB_LOCK:-/run/stb-update.lock}
+
+say() { echo "@@ $*"; }
+fail() { say "ERROR $*"; exit 1; }
+
+gh_curl() {
+  local auth=()
+  [[ -n $GITHUB_TOKEN ]] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+  curl -fsSL --retry 2 --connect-timeout 15 -H "X-GitHub-Api-Version: 2022-11-28" "${auth[@]}" "$@"
+}
+
+latest_release() { [[ -n $REPO ]] && gh_curl -H "Accept: application/vnd.github+json" "$API/repos/$REPO/releases/latest"; }
+
+asset_id() { jq -r --arg n "$2" '.assets[] | select(.name == $n) | .id' <<<"$1" | head -n1; }
+
+download_asset() { # json name dest
+  local id; id=$(asset_id "$1" "$2")
+  [[ -n $id && $id != null ]] || return 1
+  gh_curl -H "Accept: application/octet-stream" -o "$3" "$API/repos/$REPO/releases/assets/$id"
+}
+
+installed_version() { cat "$APP/stb-version.txt" 2>/dev/null || echo unknown; }
+
+cmd_check() {
+  local sys latest="" rel tmp
+  sys=$(checkupdates 2>/dev/null | wc -l)
+  if rel=$(latest_release 2>/dev/null); then
+    tmp=$(mktemp)
+    download_asset "$rel" app-version.txt "$tmp" 2>/dev/null && latest=$(tr -d '[:space:]' <"$tmp")
+    rm -f "$tmp"
+  fi
+  jq -cn --argjson system "${sys:-0}" --arg installed "$(installed_version)" --arg latest "$latest" \
+    --arg repo "$REPO" --argjson token "$([[ -n $GITHUB_TOKEN ]] && echo true || echo false)" \
+    '{system: $system, appInstalled: $installed, appLatest: $latest, repo: $repo, hasToken: $token}'
+}
+
+update_app() {
+  local rel latest
+  rel=$(latest_release) || { say "STEP App: could not reach GitHub (check network / token) — skipped"; return 0; }
+  WORK=$(mktemp -d /var/tmp/stb-app.XXXXXX)
+  local work=$WORK
+  download_asset "$rel" app-version.txt "$work/version" || { say "STEP App: no app build in the latest release — skipped"; return 0; }
+  latest=$(tr -d '[:space:]' <"$work/version")
+  if [[ $latest == "$(installed_version)" ]]; then
+    say "STEP App is up to date ($latest)"
+    return 0
+  fi
+  say "STEP Downloading app $latest"
+  download_asset "$rel" oled-iptv-app.tar.zst "$work/app.tar.zst" || fail "App download failed"
+  if download_asset "$rel" SHA256SUMS "$work/SHA256SUMS"; then
+    (cd "$work" && grep ' oled-iptv-app.tar.zst$' SHA256SUMS | sed 's/oled-iptv-app.tar.zst$/app.tar.zst/' | sha256sum -c --status) ||
+      fail "App download is corrupt (checksum mismatch)"
+  fi
+  say "STEP Installing app $latest"
+  local new; new=$(mktemp -d "$(dirname "$APP")/.oled-iptv-new.XXXXXX")
+  tar -C "$new" -I zstd -xf "$work/app.tar.zst" || { rm -rf "$new"; fail "Could not unpack the app"; }
+  [[ -x $new/oled-iptv-player ]] || { rm -rf "$new"; fail "App package is incomplete"; }
+  chmod 755 "$new"
+  chown -R root:root "$new"
+  [[ -f $new/chrome-sandbox ]] && chmod 4755 "$new/chrome-sandbox"
+  rm -rf "$APP.old"
+  [[ -d $APP ]] && mv "$APP" "$APP.old"
+  mv "$new" "$APP"
+  say "APP_UPDATED $latest"
+}
+
+WORK=""
+cleanup() { [[ -n $WORK ]] && rm -rf "$WORK"; }
+trap cleanup EXIT
+
+cmd_run() {
+  exec 9>"$LOCK"
+  flock -n 9 || fail "An update is already running"
+  exec > >(tee -a "$LOG") 2>&1
+  echo "=== $(date -Is) update started ==="
+
+  say "STEP Refreshing package signing keys"
+  pacman -Sy --noconfirm --needed archlinux-keyring || fail "Could not refresh package databases (network?)"
+
+  say "STEP Updating system packages"
+  pacman -Su --noconfirm || fail "System update failed — see $LOG"
+  # Remove cached packages except the newest version to keep the disk tidy.
+  paccache -rk1 >/dev/null 2>&1 || true
+
+  update_app
+
+  # The running kernel's modules are removed when a new kernel is installed.
+  if [[ ! -d /usr/lib/modules/$(uname -r) ]]; then
+    say "REBOOT_REQUIRED"
+  fi
+  say "DONE"
+}
+
+case ${1:-} in
+  check) cmd_check ;;
+  run) cmd_run ;;
+  reboot) systemctl reboot ;;
+  *) echo "usage: stb-update check|run|reboot" >&2; exit 2 ;;
+esac

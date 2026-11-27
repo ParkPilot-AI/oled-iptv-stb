@@ -2,7 +2,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const INVOKE = new Set([
-  'app:info', 'app:quit', 'app:toggleFullscreen',
+  'app:info', 'app:quit', 'app:restart', 'app:toggleFullscreen',
+  'system:update:check', 'system:update:run', 'system:reboot',
   'profiles:list', 'profiles:save', 'profiles:delete', 'profiles:activate',
   'settings:get', 'settings:update',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
@@ -13,7 +14,7 @@ const INVOKE = new Set([
 ]);
 const EVENTS = new Set([
   'catalog:progress', 'catalog:updated', 'epg:progress', 'epg:updated',
-  'player:closed', 'player:state', 'player:key',
+  'player:closed', 'player:state', 'player:key', 'system:update:progress',
 ]);
 
 contextBridge.exposeInMainWorld('iptv', {
