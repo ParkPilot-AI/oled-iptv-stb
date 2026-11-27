@@ -3,6 +3,8 @@
 #   stb-update check   → one JSON line: pending system updates + app versions
 #   stb-update run     → update Arch packages, then the app; progress on stdout
 #   stb-update reboot  → reboot the box
+#   stb-update wifi status|scan|connect <ssid>|forget <ssid>
+#                      → JSON; connect reads the passphrase from stdin
 # Progress protocol: lines starting with "@@ " are machine-readable
 #   @@ STEP <text> | @@ APP_UPDATED <version> | @@ REBOOT_REQUIRED | @@ DONE | @@ ERROR <text>
 set -uo pipefail
@@ -110,9 +112,70 @@ cmd_run() {
   say "DONE"
 }
 
+# ---------------------------------------------------------------- Wi-Fi
+wifi_dev() { [[ -n ${STB_WIFI_DEV:-} ]] && { echo "$STB_WIFI_DEV"; return; }; for d in /sys/class/net/*; do [[ -d $d/wireless ]] && basename "$d"; done | head -n1; }
+nocolor() { sed 's/\x1b\[[0-9;]*m//g'; }
+
+wifi_status() {
+  local dev=$1 drv
+  drv=$(basename "$(readlink -f "/sys/class/net/$dev/device/driver")" 2>/dev/null)
+  iwctl station "$dev" show 2>/dev/null | nocolor | awk -v dev="$dev" -v drv="$drv" '
+    function trim(x) { sub(/^[ \t]+/, "", x); sub(/[ \t]+$/, "", x); return x }
+    { line = $0; sub(/^[ \t]*\*?[ \t]*/, "", line)
+      n = split(line, f, /  +/)
+      if (n >= 2) v[trim(f[1])] = trim(f[2]) }
+    END {
+      rssi = v["RSSI"]; sub(/ dBm/, "", rssi)
+      printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", dev, drv, v["State"], v["Connected network"], v["IPv4 address"], rssi, v["Scanning"] }' |
+    jq -Rc 'split("\t") | {device: .[0], driver: .[1], state: (.[2] // "unknown"), ssid: (.[3] // ""), ip: (.[4] // ""), rssi: ((.[5] // "") | tonumber? // null), scanning: (.[6] == "yes")}'
+}
+
+wifi_scan() {
+  local dev=$1
+  iwctl station "$dev" scan >/dev/null 2>&1
+  for _ in $(seq 1 20); do
+    sleep 1
+    iwctl station "$dev" show 2>/dev/null | nocolor | grep -Eq 'Scanning +no' && break
+  done
+  iwctl station "$dev" get-networks rssi-dbms 2>/dev/null | nocolor | awk '
+    /^-+$/ { dashes++; next }
+    dashes >= 2 && NF {
+      line = $0; connected = (line ~ /^[ \t]*>/)
+      sub(/^[ \t]*>?[ \t]*/, "", line)
+      n = split(line, f, /  +/)
+      if (n >= 3) printf "%s\t%s\t%s\t%d\n", f[1], f[2], f[3], connected }' |
+    jq -Rsc '[split("\n")[] | select(length > 0) | split("\t") |
+      {ssid: .[0], security: .[1], rssi: ((.[2] | tonumber? // 0) | if . < -1000 then . / 100 else . end), connected: (.[3] == "1")}]
+      | sort_by(-.rssi) | unique_by(.ssid) | sort_by(-.rssi)'
+}
+
+cmd_wifi() {
+  local dev; dev=$(wifi_dev)
+  if [[ -z $dev ]]; then jq -cn '{error: "No Wi-Fi adapter found. Plug the USB Wi-Fi adapter in and try again."}'; return 1; fi
+  case ${1:-} in
+    status) wifi_status "$dev" ;;
+    scan) jq -cn --argjson networks "$(wifi_scan "$dev")" --argjson status "$(wifi_status "$dev")" '$status + {networks: $networks}' ;;
+    connect)
+      [[ -n ${2:-} ]] || { jq -cn '{error: "No network name"}'; return 1; }
+      local pass=""; IFS= read -r pass || true
+      local out
+      if [[ -n $pass ]]; then out=$(iwctl --passphrase "$pass" station "$dev" connect "$2" 2>&1 | nocolor)
+      else out=$(iwctl station "$dev" connect "$2" 2>&1 | nocolor); fi
+      for _ in $(seq 1 25); do
+        wifi_status "$dev" | jq -e '.state == "connected" and (.ip | length > 0)' >/dev/null && break
+        sleep 1
+      done
+      if wifi_status "$dev" | jq -e '.state == "connected"' >/dev/null; then wifi_status "$dev"
+      else jq -cn --arg e "${out:-Could not connect. Check the password.}" '{error: ($e | split("\n") | map(select(length > 0)) | last // "Could not connect")}'; return 1; fi ;;
+    forget) iwctl known-networks "${2:-}" forget >/dev/null 2>&1; wifi_status "$dev" ;;
+    *) echo '{"error":"usage: wifi status|scan|connect <ssid>|forget <ssid>"}'; return 2 ;;
+  esac
+}
+
 case ${1:-} in
+  wifi) shift; cmd_wifi "$@" ;;
   check) cmd_check ;;
   run) cmd_run ;;
   reboot) systemctl reboot ;;
-  *) echo "usage: stb-update check|run|reboot" >&2; exit 2 ;;
+  *) echo "usage: stb-update check|run|reboot|wifi ..." >&2; exit 2 ;;
 esac

@@ -5,6 +5,7 @@ import { clearArtCache } from '../lib/art.js';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
 import { UpdateRow } from '../components/SystemUpdate.jsx';
+import { NetworkRow } from '../components/NetworkSettings.jsx';
 
 const OPTIONS = {
   liveFormat: [['ts', 'MPEG-TS (.ts) — lowest latency'], ['m3u8', 'HLS (.m3u8)']],
@@ -100,6 +101,7 @@ export function Settings() {
           {info?.updater && (
             <>
               <h2>System</h2>
+              <NetworkRow />
               <UpdateRow />
             </>
           )}

@@ -128,6 +128,14 @@ export function createMockApi() {
   let settings = { overscan: 0, tmdbKey: '', artSource: 'missing', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, accent: '#3B82F6', ...ls.get('settings', {}) };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const wifi = {
+    status: { state: 'disconnected', ssid: '', ip: '', rssi: null },
+    networks: [
+      { ssid: 'Zyxel_D41A', security: 'psk', rssi: -56 },
+      { ssid: 'USNET-S9C923', security: 'psk', rssi: -72 },
+      { ssid: 'Cafe Free WiFi', security: 'open', rssi: -81 },
+    ],
+  };
 
   const handlers = {
     'app:info': () => ({ version: '1.0.0-web', platform: 'web', mpvPath: null, dataDir: '(browser)', build: '2026.11.27-a0acc2f', updater: true }),
@@ -201,6 +209,22 @@ export function createMockApi() {
     },
     'cache:clear': () => (catalog = null),
     'app:restart': () => setTimeout(() => location.reload(), 300),
+    'net:status': async () => ({ device: 'wlan0', driver: 'rtl8xxxu', ...wifi.status }),
+    'net:scan': async () => {
+      await wait(1500);
+      return { device: 'wlan0', driver: 'rtl8xxxu', ...wifi.status, networks: wifi.networks.map((n) => ({ ...n, connected: n.ssid === wifi.status.ssid })) };
+    },
+    'net:connect': async ({ ssid, password }) => {
+      await wait(1800);
+      const n = wifi.networks.find((x) => x.ssid === ssid);
+      if (n?.security !== 'open' && password !== 'password123') throw new Error('Operation failed');
+      wifi.status = { state: 'connected', ssid, ip: '192.168.1.42', rssi: n?.rssi ?? -60 };
+      return { device: 'wlan0', ...wifi.status };
+    },
+    'net:forget': async () => {
+      wifi.status = { state: 'disconnected', ssid: '', ip: '', rssi: null };
+      return { device: 'wlan0', ...wifi.status };
+    },
     'system:update:check': async () => {
       await wait(700);
       return { available: true, system: 42, appInstalled: '2026.11.27-a0acc2f', appLatest: '2026.11.27-c4e91b2', repo: 'ParkPilot-AI/oled-iptv-stb', hasToken: true };

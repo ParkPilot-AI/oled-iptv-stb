@@ -153,6 +153,31 @@ function runUpdate() {
   return { started: true };
 }
 
+/** Run the root helper with args (and optional stdin), parse its last JSON line. */
+function helperJson(args, input = '') {
+  return new Promise((resolve, reject) => {
+    if (!hasUpdater()) return reject(new Error('Only available on the set-top box image'));
+    const p = spawn('sudo', ['-n', UPDATER, ...args], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let err = '';
+    const t = setTimeout(() => p.kill(), 60000);
+    p.stdout.on('data', (d) => (out += d));
+    p.stderr.on('data', (d) => (err += d));
+    p.on('close', () => {
+      clearTimeout(t);
+      const last = out.trim().split('\n').pop();
+      try {
+        const j = JSON.parse(last);
+        if (j.error) reject(new Error(j.error));
+        else resolve(j);
+      } catch {
+        reject(new Error((err || out || 'No response from helper').trim().split('\n').pop()));
+      }
+    });
+    p.stdin.end(input);
+  });
+}
+
 function sendMain(channel, data) {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(channel, data);
 }
@@ -216,6 +241,10 @@ const handlers = {
     setTimeout(() => app.quit(), 200);
   },
   'system:update:check': () => checkUpdates(),
+  'net:status': () => helperJson(['wifi', 'status']),
+  'net:scan': () => helperJson(['wifi', 'scan']),
+  'net:connect': ({ ssid, password }) => helperJson(['wifi', 'connect', String(ssid)], `${password || ''}\n`),
+  'net:forget': ({ ssid }) => helperJson(['wifi', 'forget', String(ssid)]),
   'system:update:run': () => runUpdate(),
   'system:reboot': () => {
     if (!hasUpdater()) throw new Error('Not available on this system');

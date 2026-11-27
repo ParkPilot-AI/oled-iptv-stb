@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const INVOKE = new Set([
   'app:info', 'app:quit', 'app:restart', 'app:toggleFullscreen',
   'system:update:check', 'system:update:run', 'system:reboot',
+  'net:status', 'net:scan', 'net:connect', 'net:forget',
   'profiles:list', 'profiles:save', 'profiles:delete', 'profiles:activate',
   'settings:get', 'settings:update',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',

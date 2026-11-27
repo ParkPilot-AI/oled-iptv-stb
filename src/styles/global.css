@@ -1790,3 +1790,62 @@ small {
   text-transform: none;
   letter-spacing: 0;
 }
+
+/* ---------- network ---------- */
+.net-modal {
+  width: 64rem;
+}
+.settings-col .net-modal h2 {
+  margin: 0 0 0.3rem;
+  color: var(--text);
+  font-size: 1.8rem;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.net-status {
+  margin-bottom: 1rem;
+}
+.net-list {
+  max-height: 30rem;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.net-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.net-item .net-row {
+  flex: 1;
+}
+.net-name {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+.net-tag {
+  padding: 0.05rem 0.55rem;
+  border-radius: 0.4rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85rem;
+}
+.wifi-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.15rem;
+  height: 1.4rem;
+  margin-left: 0.6rem;
+  vertical-align: middle;
+}
+.wifi-bars i {
+  width: 0.3rem;
+  border-radius: 0.1rem;
+  background: #3a3a40;
+}
+.wifi-bars i.on {
+  background: var(--text);
+}
+.update-step .btn-small {
+  margin-left: auto;
+}

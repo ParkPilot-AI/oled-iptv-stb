@@ -44,28 +44,62 @@ OFFLINE=0
 
 # ---------------------------------------------------------------- Wi-Fi
 say "Network"
+# USB Wi-Fi dongles must never be power-suspended (they vanish or stall),
+# and iwd must pick up /etc/iwd/main.conf (no MAC randomisation, no power save).
+echo -1 > /sys/module/usbcore/parameters/autosuspend 2>/dev/null || true
+for f in /sys/bus/usb/devices/*/power/control; do echo on > "$f" 2>/dev/null || true; done
+systemctl restart iwd 2>/dev/null || true
+sleep 3
 WIFI_DEV=$(for d in /sys/class/net/*; do [[ -d $d/wireless ]] && basename "$d"; done | head -n1)
+
+# Scan, wait until the adapter reports the scan finished (slow on USB
+# dongles), print the list. Succeeds if at least one network was found.
+scan_networks() {
+  iwctl station "$WIFI_DEV" scan >/dev/null 2>&1
+  for _ in $(seq 1 20); do
+    sleep 1
+    iwctl station "$WIFI_DEV" show 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | grep -Eq 'Scanning +no' && break
+  done
+  local out
+  out=$(iwctl station "$WIFI_DEV" get-networks 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
+  printf '%s\n' "$out" | sed -n '1,25p' | indent
+  ! grep -qi 'no networks available' <<<"$out" && (( $(grep -c . <<<"$out") > 4 ))
+}
+
 if [[ -n $WIFI_DEV ]]; then
-  p "Wi-Fi adapter: $WIFI_DEV"
+  drv=$(basename "$(readlink -f "/sys/class/net/$WIFI_DEV/device/driver")" 2>/dev/null)
+  p "Wi-Fi adapter: $WIFI_DEV${drv:+ ($drv)}"
   [[ $OFFLINE == 1 ]] && p "(Packages are on this USB stick, so Wi-Fi is only set up for the box itself.)"
-  for attempt in 1 2 3; do
-    iwctl station "$WIFI_DEV" scan >/dev/null 2>&1; sleep 4
-    echo; iwctl station "$WIFI_DEV" get-networks 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | sed -n '1,25p' | indent
-    if online; then
-      SSID=$(ask "Wi-Fi network name for the box (Enter to skip — already online): ")
+  p "Scanning for networks... USB adapters can take up to 20 seconds."
+  for attempt in 1 2 3 4 5 6; do
+    if scan_networks; then
+      if online; then
+        SSID=$(ask "Wi-Fi network name for the box (Enter to skip, already online): ")
+        [[ -z $SSID ]] && break
+      else
+        SSID=$(ask "Wi-Fi network name (exactly as shown, Enter to rescan, s to skip): ")
+        [[ -z $SSID ]] && continue
+      fi
     else
-      SSID=$(ask "Wi-Fi network name (exactly as shown above): ")
+      warn "No networks found yet."
+      SSID=$(ask "Press Enter to scan again, type your network name, or s to skip: ")
+      [[ -z $SSID ]] && continue
     fi
-    [[ -z $SSID ]] && break
+    if [[ $SSID == s || $SSID == S ]]; then
+      SSID=""
+      break
+    fi
     read -r -s -p "${M}Password for \"$SSID\": " PSK; echo
-    if iwctl --passphrase "$PSK" station "$WIFI_DEV" connect "$SSID"; then
-      for _ in $(seq 1 20); do online && break; sleep 1; done
+    if iwctl --passphrase "$PSK" station "$WIFI_DEV" connect "$SSID" 2>&1 | indent; then
+      for _ in $(seq 1 25); do online && break; sleep 1; done
     fi
     if online; then p "${c_g}Connected.${c_0}"; break; fi
-    warn "Could not connect (attempt $attempt/3). Check the name and password."
+    warn "Could not connect (attempt $attempt/6). Check the name and password."
   done
+  [[ -z ${SSID:-} ]] && p "Skipping Wi-Fi: you can connect later in the app (Settings > Network)."
 else
-  warn "No Wi-Fi adapter found — using Ethernet if plugged in."
+  warn "No Wi-Fi adapter found. Using Ethernet if plugged in."
+  p "Tip: plug the USB Wi-Fi adapter in before booting the installer."
 fi
 for _ in $(seq 1 15); do online && break; sleep 1; done
 if ! online; then
@@ -251,7 +285,7 @@ cat > "$MNT/boot/loader/entries/iptv.conf" <<EOF
 title   OLED IPTV
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root=PARTUUID=$ROOT_UUID rw quiet loglevel=3 rd.udev.log_level=3 systemd.show_status=false vt.global_cursor_default=0 i915.fastboot=1 nowatchdog
+options root=PARTUUID=$ROOT_UUID rw quiet loglevel=3 rd.udev.log_level=3 systemd.show_status=false vt.global_cursor_default=0 i915.fastboot=1 nowatchdog usbcore.autosuspend=-1
 EOF
 # Older mkinitcpio without the microcode hook: load it explicitly.
 if ! grep -Eq '^HOOKS=.*\bmicrocode\b' "$MNT/etc/mkinitcpio.conf"; then

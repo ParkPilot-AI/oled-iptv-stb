@@ -58,13 +58,23 @@ If anything fails, the error is shown along with the log at `/root/stb-install.l
 | Maintenance shell | **Ctrl+Alt+F2**, log in as `tv` (sudo works). **Ctrl+Alt+F1** goes back to the TV |
 | System updates | `sudo pacman -Syu` from the maintenance shell, then reboot |
 | Restart the app | In the app choose **Settings → Exit app**. It relaunches in 2 seconds |
-| Change Wi-Fi | `iwctl station wlan0 connect "NewNetwork"` |
+| Change Wi-Fi | **Settings → System → Wi-Fi**: scan, pick a network, type the password with the remote. (Shell: `iwctl station wlan0 connect "NewNetwork"`.) |
 | Keep audio on the headphone jack | `echo STB_AUDIO=analog | sudo tee -a /etc/environment` |
 | Logs | `/tmp/oled-iptv.log` (app), `/tmp/xsession.log` (X) |
 | Update everything | **Settings → System → Update system**. One button updates the Arch packages (`pacman -Syu`) and the OLED IPTV app (from the newest GitHub release, checksum-verified, old version kept in `/opt/oled-iptv.old`). The app then restarts; a reboot is offered if a new kernel was installed. Log: `/var/log/stb-update.log` |
 | Check hardware decoding | Press **I** while playing. *HW decoding* should say `vaapi` |
 
-## 5. One-button updates
+## 5. USB Wi-Fi adapters
+
+Small Realtek USB dongles such as the **TP-Link TL-WN725N** (RTL8188EUS, `rtl8xxxu` driver) are supported. Both the installer and the box configure iwd to work around these dongles' quirks:
+
+* scan MAC randomisation is turned off, because these dongles return empty scans with it;
+* power saving is turned off for these drivers;
+* USB autosuspend is disabled (`usbcore.autosuspend=-1`), so the dongle doesn't disappear.
+
+Plug the dongle in **before** booting the installer. Scans can take up to 20 s.
+
+## 6. One-button updates
 
 The installer sets up three things:
 
@@ -82,6 +92,6 @@ echo 'tv ALL=(root) NOPASSWD: /usr/local/sbin/stb-update' | sudo tee /etc/sudoer
 printf 'REPO="ParkPilot-AI/oled-iptv-stb"\nGITHUB_TOKEN="<token>"\n' | sudo install -Dm600 /dev/stdin /etc/stb/update.conf
 ```
 
-## 6. Status
+## 7. Status
 
 The scripts pass lint checks and the app build steps are the same ones I tested elsewhere. **The ISO build and the install itself have not been run yet**, because Arch package mirrors aren't reachable from the environment where this kit was written. Expect to need a small fix or two on first use. The log file shows exactly where anything stopped.
