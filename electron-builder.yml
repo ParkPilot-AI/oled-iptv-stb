@@ -11,6 +11,7 @@ asarUnpack:
   - electron/workers/**
   - electron/xmltv.js
   - electron/xtream.js
+  - electron/artmatch.js
 extraResources:
   # Drop mpv.exe (+ its DLLs, if any) in resources/mpv/win before running `npm run dist:win`.
   - from: resources/mpv/${os}
