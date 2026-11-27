@@ -6,28 +6,37 @@ set -uo pipefail
 
 FILES=/root/stb-files
 PAYLOAD=/opt/stb-payload/oled-iptv.tar.zst
+REPO_DIR=/opt/stb-repo # offline package repository shipped on the USB stick
 MNT=/mnt
 LOG=/root/stb-install.log
 exec > >(tee -a "$LOG") 2>&1
 
+# Big, readable console font on 4K TVs, and a left margin on every line so TVs
+# that crop the picture edges (overscan) don't cut text off.
+setfont ter-v32b 2>/dev/null || setfont ter-v28b 2>/dev/null || true
+M='      '
+indent() { sed -u "s/^/$M/"; }
 c_b=$'\e[1m'; c_g=$'\e[32m'; c_r=$'\e[31m'; c_y=$'\e[33m'; c_0=$'\e[0m'
-say()  { printf '\n%s==>%s %s\n' "$c_g" "$c_0" "$*"; }
-warn() { printf '%s!!%s %s\n' "$c_y" "$c_0" "$*"; }
-die()  { printf '\n%sERROR:%s %s\nLog: %s\nType  bash /root/stb-install.sh  to try again.\n' "$c_r" "$c_0" "$*" "$LOG"; exit 1; }
-ask()  { local __v; read -r -p "$1" __v; printf '%s' "$__v"; }
+p()    { printf '%s%s\n' "$M" "$*"; }
+say()  { printf '\n%s%s==>%s %s\n' "$M" "$c_g" "$c_0" "$*"; }
+warn() { printf '%s%s!!%s %s\n' "$M" "$c_y" "$c_0" "$*"; }
+die()  { printf '\n%s%sERROR:%s %s\n%sLog: %s\n%sType  bash /root/stb-install.sh  to try again.\n' "$M" "$c_r" "$c_0" "$*" "$M" "$LOG" "$M"; exit 1; }
+ask()  { local __v; read -r -p "$M$1" __v; printf '%s' "$__v"; }
 online() { ping -c1 -W3 archlinux.org >/dev/null 2>&1; }
 
 clear
-cat <<EOF
-${c_b}
-  ┌──────────────────────────────────────────────┐
-  │        OLED IPTV  ·  set-top box installer    │
-  └──────────────────────────────────────────────┘${c_0}
-  This will ERASE one disk and turn this PC into a dedicated
-  IPTV box that boots straight into the player.
+printf '\n\n'
+indent <<EOF
+${c_b}┌──────────────────────────────────────────────┐
+│        OLED IPTV  ·  set-top box installer    │
+└──────────────────────────────────────────────┘${c_0}
+This will ERASE one disk and turn this PC into a dedicated
+IPTV box that boots straight into the player.
 
-  Press Ctrl+C at any time to cancel and get a shell.
+Press Ctrl+C at any time to cancel and get a shell.
 EOF
+OFFLINE=0
+[[ -f $REPO_DIR/stb.db ]] && OFFLINE=1
 
 # ---------------------------------------------------------------- checks
 [[ -d /sys/firmware/efi/efivars ]] || die "This PC booted in legacy BIOS mode. In the BIOS setup (F2 on Dell) set Boot Mode to UEFI, disable Secure Boot, and boot the USB again."
@@ -37,31 +46,39 @@ EOF
 say "Network"
 WIFI_DEV=$(for d in /sys/class/net/*; do [[ -d $d/wireless ]] && basename "$d"; done | head -n1)
 if [[ -n $WIFI_DEV ]]; then
-  echo "Wi-Fi adapter: $WIFI_DEV"
+  p "Wi-Fi adapter: $WIFI_DEV"
+  [[ $OFFLINE == 1 ]] && p "(Packages are on this USB stick, so Wi-Fi is only set up for the box itself.)"
   for attempt in 1 2 3; do
     iwctl station "$WIFI_DEV" scan >/dev/null 2>&1; sleep 4
-    echo; iwctl station "$WIFI_DEV" get-networks 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | sed -n '1,25p'
+    echo; iwctl station "$WIFI_DEV" get-networks 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' | sed -n '1,25p' | indent
     if online; then
       SSID=$(ask "Wi-Fi network name for the box (Enter to skip — already online): ")
     else
       SSID=$(ask "Wi-Fi network name (exactly as shown above): ")
     fi
     [[ -z $SSID ]] && break
-    read -r -s -p "Password for \"$SSID\": " PSK; echo
+    read -r -s -p "${M}Password for \"$SSID\": " PSK; echo
     if iwctl --passphrase "$PSK" station "$WIFI_DEV" connect "$SSID"; then
       for _ in $(seq 1 20); do online && break; sleep 1; done
     fi
-    if online; then echo "${c_g}Connected.${c_0}"; break; fi
+    if online; then p "${c_g}Connected.${c_0}"; break; fi
     warn "Could not connect (attempt $attempt/3). Check the name and password."
   done
 else
   warn "No Wi-Fi adapter found — using Ethernet if plugged in."
 fi
 for _ in $(seq 1 15); do online && break; sleep 1; done
-online || die "No internet connection. Plug in Ethernet or re-run and check the Wi-Fi details."
+if ! online; then
+  if [[ $OFFLINE == 1 ]]; then
+    warn "No internet right now. That's OK: everything installs from the USB stick."
+  else
+    die "No internet connection. Plug in Ethernet or re-run and check the Wi-Fi details."
+  fi
+fi
 
-# The live USB picks mirrors at boot, before Wi-Fi was up: make sure we have some.
-if ! grep -q '^Server' /etc/pacman.d/mirrorlist; then
+# The live USB picks mirrors at boot, before Wi-Fi was up: make sure we have some
+# (used for the online fallback and copied to the box for future updates).
+if online && ! grep -q '^Server' /etc/pacman.d/mirrorlist; then
   say "Selecting fast package mirrors"
   systemctl stop reflector.service 2>/dev/null || true
   timeout 90 reflector --protocol https --latest 15 --sort rate --save /etc/pacman.d/mirrorlist 2>/dev/null || true
@@ -85,7 +102,7 @@ mapfile -t DISKS < <(lsblk -dpno NAME,TYPE,RM | awk '$2=="disk"{print $1}' | gre
 [[ ${#DISKS[@]} -gt 0 ]] || die "No internal disk found. In the BIOS, set SATA/NVMe mode to AHCI (not RAID)."
 i=1
 for d in "${DISKS[@]}"; do
-  printf '  %d) %s  %s  %s\n' "$i" "$d" "$(lsblk -dno SIZE "$d")" "$(lsblk -dno MODEL "$d" | xargs)"
+  printf '%s  %d) %s  %s  %s\n' "$M" "$i" "$d" "$(lsblk -dno SIZE "$d")" "$(lsblk -dno MODEL "$d" | xargs)"
   i=$((i + 1))
 done
 if [[ ${#DISKS[@]} -eq 1 ]]; then
@@ -105,7 +122,7 @@ else
   done
 fi
 echo
-echo "${c_r}${c_b}ALL DATA on $DISK ($(lsblk -dno SIZE "$DISK")) will be permanently erased.${c_0}"
+p "${c_r}${c_b}ALL DATA on $DISK ($(lsblk -dno SIZE "$DISK")) will be permanently erased.${c_0}"
 [[ $(ask "Type YES to continue: ") == YES ]] || die "Cancelled — nothing was changed."
 
 # ---------------------------------------------------------------- settings
@@ -116,17 +133,17 @@ KB=$(ask "Keyboard layout [gb]: "); KB=${KB:-gb}
 HOST=$(ask "Box name on the network [iptv-box]: "); HOST=${HOST:-iptv-box}
 DEFAULT_REPO=$(cat /root/stb-files/update-repo 2>/dev/null)
 echo
-echo "One-button updates download new app builds from a GitHub repository."
+p "One-button updates download new app builds from a GitHub repository."
 UPD_REPO=$(ask "GitHub repo for app updates [${DEFAULT_REPO:-none}]: "); UPD_REPO=${UPD_REPO:-$DEFAULT_REPO}
 UPD_TOKEN=""
 if [[ -n $UPD_REPO ]]; then
-  echo "If that repo is PRIVATE, paste a read-only GitHub token (fine-grained, Contents: read)."
-  read -r -s -p "GitHub token (Enter to skip): " UPD_TOKEN; echo
+  p "If that repo is PRIVATE, paste a read-only GitHub token (fine-grained, Contents: read)."
+  read -r -s -p "${M}GitHub token (Enter to skip): " UPD_TOKEN; echo
 fi
-echo "A maintenance login 'tv' is created (Ctrl+Alt+F2 on the box)."
+p "A maintenance login 'tv' is created (Ctrl+Alt+F2 on the box)."
 while true; do
-  read -r -s -p "Choose a password for user 'tv': " PW1; echo
-  read -r -s -p "Repeat password: " PW2; echo
+  read -r -s -p "${M}Choose a password for user 'tv': " PW1; echo
+  read -r -s -p "${M}Repeat password: " PW2; echo
   [[ -n $PW1 && $PW1 == "$PW2" ]] && break
   warn "Passwords empty or different, try again."
 done
@@ -147,19 +164,33 @@ mount -o noatime "$ROOT_PART" "$MNT"
 mount --mkdir "$EFI_PART" "$MNT/boot"
 
 # ---------------------------------------------------------------- packages
-say "Installing system packages (a few minutes, depends on your connection)"
-PKGS=(
-  base linux linux-firmware intel-ucode sudo
-  iwd wireless-regdb
-  mesa vulkan-intel intel-media-driver libva-utils
-  xorg-server xorg-xinit xorg-xset openbox picom
-  mpv ffmpeg
-  pipewire pipewire-pulse pipewire-alsa wireplumber libpulse alsa-utils
-  gtk3 nss alsa-lib libcups libxss libxtst at-spi2-core libdrm libxkbcommon libsecret
-  noto-fonts ttf-dejavu
-  pacman-contrib jq curl
-)
-pacstrap -K "$MNT" "${PKGS[@]}" || die "pacstrap failed (network or mirror problem). Re-run to retry."
+mapfile -t PKGS < <(grep -v '^[[:space:]]*#' "$FILES/packages.txt" | tr -s ' \t' '\n' | grep -v '^$')
+if [[ $OFFLINE == 1 ]]; then
+  say "Installing system packages from the USB stick (no download needed)"
+  # Packages were downloaded and signature-checked when the ISO was built.
+  cat > /tmp/pacman-offline.conf <<CONF
+[options]
+Architecture = auto
+SigLevel = Never
+[stb]
+Server = file://$REPO_DIR
+CONF
+  if ! pacstrap -C /tmp/pacman-offline.conf -K "$MNT" "${PKGS[@]}" 2>&1 | indent; then
+    warn "Offline install failed, trying to download instead."
+    online || die "Offline install failed and there is no internet connection."
+    pacstrap -K "$MNT" "${PKGS[@]}" 2>&1 | indent || die "pacstrap failed (network or mirror problem). Re-run to retry."
+  fi
+else
+  say "Installing system packages (a few minutes, depends on your connection)"
+  pacstrap -K "$MNT" "${PKGS[@]}" 2>&1 | indent || die "pacstrap failed (network or mirror problem). Re-run to retry."
+fi
+[[ -x $MNT/usr/bin/pacman ]] || die "System packages did not install correctly (see $LOG)."
+# Future updates (Settings → Update system) need online mirrors on the box.
+if grep -q '^Server = http' /etc/pacman.d/mirrorlist; then
+  cp /etc/pacman.d/mirrorlist "$MNT/etc/pacman.d/mirrorlist"
+else
+  printf '%s\n' 'Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch' 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > "$MNT/etc/pacman.d/mirrorlist"
+fi
 
 # ---------------------------------------------------------------- app
 say "Installing OLED IPTV"
@@ -173,7 +204,7 @@ ln -sf /opt/oled-iptv/oled-iptv-player "$MNT/usr/local/bin/oled-iptv-player"
 say "Configuring the system"
 genfstab -U "$MNT" >> "$MNT/etc/fstab"
 echo "$HOST" > "$MNT/etc/hostname"
-echo "KEYMAP=${KB/gb/uk}" > "$MNT/etc/vconsole.conf"
+printf 'KEYMAP=%s\nFONT=ter-v32b\n' "${KB/gb/uk}" > "$MNT/etc/vconsole.conf"
 mkdir -p "$MNT/etc/X11/xorg.conf.d"
 cat > "$MNT/etc/X11/xorg.conf.d/00-keyboard.conf" <<EOF
 Section "InputClass"
@@ -255,13 +286,13 @@ sync
 umount -R "$MNT"
 
 say "Done!"
-cat <<EOF
+indent <<EOF
 
-  ${c_b}Remove the USB stick, then press Enter to reboot.${c_0}
-  The box will boot straight into OLED IPTV. Add your provider
-  on the first screen.
+${c_b}Remove the USB stick, then press Enter to reboot.${c_0}
+The box will boot straight into OLED IPTV. Add your provider
+on the first screen.
 
-  Maintenance: Ctrl+Alt+F2 → log in as 'tv'.  (Ctrl+Alt+F1 returns.)
+Maintenance: Ctrl+Alt+F2 → log in as 'tv'.  (Ctrl+Alt+F1 returns.)
 EOF
 read -r
 reboot

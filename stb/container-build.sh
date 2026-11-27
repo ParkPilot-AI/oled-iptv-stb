@@ -30,10 +30,27 @@ echo "${STB_REPO:-}" > /build/profile/airootfs/root/stb-files/update-repo
 mkdir -p /build/profile/airootfs/opt/stb-payload
 cp /build/payload/oled-iptv.tar.zst /build/profile/airootfs/opt/stb-payload/
 
-# Extra live-environment packages the installer uses.
-for p in arch-install-scripts gptfdisk dosfstools e2fsprogs iwd iw zstd; do
+# Live environment: swap the 'all firmware' meta package for the split
+# packages a Dell OptiPlex needs (saves ~400 MB, keeping the ISO < 2 GB for
+# GitHub releases), and add what the installer uses.
+sed -i '/^linux-firmware/d' /build/profile/packages.x86_64
+for p in arch-install-scripts gptfdisk dosfstools e2fsprogs iwd iw zstd terminus-font \
+         linux-firmware-intel linux-firmware-realtek linux-firmware-atheros linux-firmware-mediatek; do
   grep -qx "$p" /build/profile/packages.x86_64 || echo "$p" >> /build/profile/packages.x86_64
 done
+
+echo "==> Downloading the box's packages into an offline repository"
+# Fresh pacman db → every dependency is downloaded, not just what's missing here.
+# Downloads are signature-checked against the Arch keyring during this step.
+mapfile -t PKGS < <(grep -v '^[[:space:]]*#' /kit/overlay/airootfs/root/stb-files/packages.txt | tr -s ' \t' '\n' | grep -v '^$')
+mkdir -p /build/repo /build/blankdb
+pacman -Sy --dbpath /build/blankdb --noconfirm >/dev/null
+pacman -Sw --dbpath /build/blankdb --cachedir /build/repo --noconfirm "${PKGS[@]}"
+repo-add -q /build/repo/stb.db.tar.gz /build/repo/*.pkg.tar.zst
+rm -f /build/repo/*.sig
+mkdir -p /build/profile/airootfs/opt
+mv /build/repo /build/profile/airootfs/opt/stb-repo
+du -sh /build/profile/airootfs/opt/stb-repo
 
 # Branding + start installer on tty1 after the automatic root login.
 sed -i \
@@ -53,4 +70,5 @@ EOF
 
 echo "==> Building ISO"
 mkarchiso -v -w /build/work -o /out /build/profile
+ls -l /out
 chown "${HOST_UID:-0}:${HOST_GID:-0}" /out/*

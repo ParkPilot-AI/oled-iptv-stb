@@ -1,0 +1,30 @@
+# Packages installed on the set-top box. Shared by the ISO build (which
+# downloads them, plus every dependency, into an offline repo on the USB
+# stick) and by the installer.
+
+# Base system (split firmware: Intel GPU/Wi-Fi/BT, Realtek Ethernet/Wi-Fi,
+# Qualcomm Atheros + MediaTek Wi-Fi cards found in Dell OptiPlex micro PCs)
+base linux mkinitcpio intel-ucode sudo terminus-font
+linux-firmware-intel linux-firmware-realtek linux-firmware-atheros linux-firmware-mediatek
+
+# Networking
+iwd wireless-regdb iptables
+
+# Graphics + hardware video decoding (Intel UHD / VA-API)
+mesa vulkan-intel intel-media-driver libva-utils
+
+# Kiosk session
+xorg-server xorg-xinit xorg-xset openbox picom
+
+# Playback + audio over HDMI
+mpv ffmpeg
+pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber libpulse alsa-utils
+
+# Libraries the Electron app needs
+gtk3 nss alsa-lib libcups libxss libxtst at-spi2-core libdrm libxkbcommon libsecret
+
+# Fonts
+noto-fonts ttf-dejavu
+
+# One-button updater
+pacman-contrib jq curl
