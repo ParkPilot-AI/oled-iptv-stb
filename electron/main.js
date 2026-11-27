@@ -17,6 +17,7 @@ import { registerImageScheme, handleImageProtocol, pruneImageCache, clearImageCa
 import { Player } from './player.js';
 import { getArtwork, testTmdbKey, clearArtworkCache } from './artwork.js';
 import { resolveMpvBinary } from './mpv.js';
+import * as audio from './audio.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -269,7 +270,18 @@ const handlers = {
   },
 
   'settings:get': () => store.getSettings(),
-  'settings:update': (patch) => store.updateSettings(patch),
+  'settings:update': async (patch) => {
+    if ('audioDevice' in patch) await audio.applyOutput(patch.audioDevice);
+    const s = await store.updateSettings(patch);
+    if (['audioDevice', 'subMode', 'subLang', 'subSize', 'subBackground'].some((k) => k in patch)) await player.applySettings(s);
+    return s;
+  },
+  'audio:outputs': async () => {
+    const s = await store.getSettings();
+    const mpvBinary = resolveMpvBinary({ customPath: s.mpvPath, resourcesPath: process.resourcesPath });
+    const r = await audio.listOutputs({ mpvBinary });
+    return { ...r, current: s.audioDevice || 'auto' };
+  },
 
   'catalog:load': ({ profileId, force }) => catalog.loadCatalog(profileId, { force }, sendMain),
   'epg:load': ({ profileId, force }) => catalog.loadEpg(profileId, { force }, sendMain),
@@ -321,6 +333,13 @@ app.whenReady().then(async () => {
   await createMainWindow();
   createOsdWindow(); // pre-warm so the first playback overlay appears instantly
   setTimeout(() => pruneImageCache().catch(() => {}), 15000);
+  // Re-apply a chosen sound output after login (the box's boot script picks HDMI).
+  const applySavedAudio = async () => {
+    const s = await store.getSettings();
+    if (String(s.audioDevice || '').startsWith('pa:')) await audio.applyOutput(s.audioDevice).catch(() => {});
+  };
+  setTimeout(applySavedAudio, 4000);
+  setTimeout(applySavedAudio, 25000);
 });
 
 app.on('before-quit', () => {

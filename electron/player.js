@@ -5,6 +5,7 @@ import path from 'node:path';
 import fsp from 'node:fs/promises';
 import { Mpv, buildMpvArgs, makeIpcPath, resolveMpvBinary, INPUT_CONF } from './mpv.js';
 import { streamUrl } from './xtream.js';
+import { pickSubtitle, subStyleProps } from './subs.js';
 import { getCredentials, getSettings, getDoc, setDoc, dataDir } from './store.js';
 
 const PROGRESS_EVERY_MS = 10000;
@@ -62,7 +63,30 @@ export class Player {
     });
     await mpv.start();
     this.mpv = mpv;
+    await this._applyOutputAndStyle(mpv, settings);
     return mpv;
+  }
+
+  async _applyOutputAndStyle(mpv, settings) {
+    const dev = String(settings.audioDevice || 'auto');
+    await mpv.set('audio-device', dev.startsWith('mpv:') ? dev.slice(4) : 'auto').catch(() => {});
+    for (const [k, v] of Object.entries(subStyleProps(settings))) await mpv.set(k, v).catch(() => {});
+  }
+
+  async _applySubtitleChoice() {
+    const s = this.session;
+    if (!this.mpv || !s) return;
+    const tracks = await this.mpv.get('track-list').catch(() => null);
+    const id = pickSubtitle(tracks, { mode: s.settings.subMode, lang: s.settings.subLang });
+    await this.mpv.set('sid', id).catch(() => {});
+  }
+
+  /** Settings changed while playing: apply audio output / subtitle prefs live. */
+  async applySettings(settings) {
+    if (this.session) this.session.settings = settings;
+    if (!this.mpv) return;
+    await this._applyOutputAndStyle(this.mpv, settings);
+    await this._applySubtitleChoice();
   }
 
   /** Start a session. items: [{kind,id,name,ext,...}], index: start position. */
@@ -112,6 +136,7 @@ export class Player {
     };
     this._broadcast(true);
     await this.mpv.set('pause', false).catch(() => {});
+    await this.mpv.set('sid', 'no').catch(() => {}); // chosen on file-loaded from the user's prefs
     await this.mpv.load(url, { start });
   }
 
@@ -186,6 +211,7 @@ export class Player {
       st.buffering = false;
       st.error = null;
       this._broadcast(true);
+      this._applySubtitleChoice();
     } else if (e.event === 'end-file') {
       if (e.reason === 'eof') this._onEof();
       else if (e.reason === 'error') this._onError(e.file_error || 'playback error');

@@ -20,7 +20,44 @@ const OPTIONS = {
   accent: [['#3B82F6', 'Blue'], ['#10B981', 'Emerald'], ['#A78BFA', 'Violet'], ['#F59E0B', 'Amber']],
   artSource: [['missing', 'Fill gaps (provider first)'], ['prefer', 'Prefer TMDB'], ['off', 'Off']],
   logoSource: [['missing', 'Fill gaps (provider first)'], ['prefer', 'Prefer iptv-org'], ['off', 'Off']],
+  subMode: [['off', 'Off'], ['on', 'On'], ['forced', 'Only for foreign dialogue']],
+  subLang: [['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['it', 'Italian'], ['pt', 'Portuguese'], ['nl', 'Dutch'], ['pl', 'Polish'], ['tr', 'Turkish'], ['ar', 'Arabic'], ['hi', 'Hindi'], ['ur', 'Urdu'], ['ro', 'Romanian'], ['el', 'Greek'], ['sv', 'Swedish']],
+  subSize: [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large'], ['xlarge', 'Extra large']],
+  subBackground: [['box', 'Dark box (easiest to read)'], ['outline', 'Outline only']],
 };
+
+/** Sound output: cycles through what this machine actually has (HDMI ports, jack, USB…). */
+function AudioOutputRow({ settings, update }) {
+  const [list, setList] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api.invoke('audio:outputs').then(setList).catch(() => setList({ outputs: [{ id: 'auto', label: 'Automatic' }] }));
+  }, []);
+  const outs = list?.outputs || [];
+  const cur = settings.audioDevice || 'auto';
+  const idx = Math.max(0, outs.findIndex((o) => o.id === cur));
+  const next = async () => {
+    if (busy || outs.length < 2) return;
+    const o = outs[(idx + 1) % outs.length];
+    setBusy(true);
+    try {
+      await update({ audioDevice: o.id });
+      toast(`Sound: ${o.label}`);
+    } catch (e) {
+      toast(`Couldn't switch output: ${e.message}`, 5000);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Focusable className="setting-row" onSelect={next}>
+      <span>Audio output</span>
+      <span className="setting-value">
+        {!list ? 'Checking…' : busy ? 'Switching…' : outs[idx]?.label || 'Automatic'} {outs.length > 1 && <span className="muted">›</span>}
+      </span>
+    </Focusable>
+  );
+}
 
 function Cycle({ label, k, settings, update, autoFocus }) {
   const opts = OPTIONS[k];
@@ -91,6 +128,12 @@ export function Settings() {
           <Cycle label="Hide on-screen controls after" k="osdTimeoutSec" settings={settings} update={update} />
           <Cycle label="Screensaver when paused" k="screensaverMin" settings={settings} update={update} />
           <TextField label="Custom mpv path" value={settings.mpvPath} onChange={(v) => update({ mpvPath: v })} placeholder={info?.mpvPath ? `Using ${info.mpvPath}` : 'mpv not found'} />
+          <h2>Audio & subtitles</h2>
+          <AudioOutputRow settings={settings} update={update} />
+          <Cycle label="Subtitles" k="subMode" settings={settings} update={update} />
+          <Cycle label="Subtitle language" k="subLang" settings={settings} update={update} />
+          <Cycle label="Subtitle size" k="subSize" settings={settings} update={update} />
+          <Cycle label="Subtitle background" k="subBackground" settings={settings} update={update} />
           <h2>Display</h2>
           <Cycle label="Screen fit (if edges are cut off)" k="overscan" settings={settings} update={update} />
           <Cycle label="Accent colour" k="accent" settings={settings} update={update} />

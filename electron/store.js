@@ -139,6 +139,11 @@ export const DEFAULT_SETTINGS = {
   tmdbKey: '', // free key from themoviedb.org (v3 key or v4 read token)
   artSource: 'missing', // movies/series artwork: missing | prefer | off
   logoSource: 'missing', // channel logos from iptv-org: missing | prefer | off
+  audioDevice: 'auto', // auto | pa:<card>|<profile> (PipeWire) | mpv:<device>
+  subMode: 'forced', // off | on | forced (only foreign-dialogue tracks)
+  subLang: 'en',
+  subSize: 'medium', // small | medium | large | xlarge
+  subBackground: 'box', // box | outline
 };
 const settingsFile = () => path.join(dataDir(), 'settings.json');
 let settingsCache = null;

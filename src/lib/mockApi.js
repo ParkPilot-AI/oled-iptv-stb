@@ -125,7 +125,7 @@ export function createMockApi() {
   const listeners = new Map();
   const emit = (ch, data) => listeners.get(ch)?.forEach((cb) => cb(data));
   let catalog = null;
-  let settings = { overscan: 0, tmdbKey: '', artSource: 'missing', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, accent: '#3B82F6', ...ls.get('settings', {}) };
+  let settings = { overscan: 0, tmdbKey: '', artSource: 'missing', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, accent: '#3B82F6', audioDevice: 'auto', subMode: 'forced', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const wifi = {
@@ -162,6 +162,15 @@ export function createMockApi() {
       return { user: { status: 'Active', expires: Date.now() + 90 * 864e5, maxConnections: 2 } };
     },
     'settings:get': () => settings,
+    'audio:outputs': async () => {
+      await wait(300);
+      return { backend: 'pactl', current: settings.audioDevice || 'auto', outputs: [
+        { id: 'auto', label: 'Automatic (TV via HDMI)' },
+        { id: 'pa:alsa_card.pci-0000_00_1f.3|output:hdmi-stereo', label: 'TV (HDMI)' },
+        { id: 'pa:alsa_card.pci-0000_00_1f.3|output:hdmi-stereo-extra1', label: 'TV (HDMI 2)' },
+        { id: 'pa:alsa_card.pci-0000_00_1f.3|output:analog-stereo', label: 'Headphone jack / speakers' },
+      ] };
+    },
     'settings:update': (patch) => {
       settings = { ...settings, ...patch };
       ls.set('settings', settings);

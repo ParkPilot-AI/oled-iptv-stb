@@ -152,6 +152,8 @@ In text fields and on Search, typing on a physical keyboard goes straight in, an
 
 ---
 
+**Audio & subtitles (Settings).** *Audio output* cycles through the outputs this machine has: TV (HDMI), a second HDMI port, the headphone jack, USB or Bluetooth audio. On Linux it switches the PipeWire card profile and moves playing audio straight away; elsewhere it uses mpv's device list. *Subtitles* can be Off, On, or *Only for foreign dialogue* (forced tracks, the default), in your preferred language, with four sizes and a dark box or outline style. Changes apply to what's playing. **S** still cycles subtitle tracks by hand.
+
 ## 5. Artwork
 
 * **Channel logos** come from the open [iptv-org](https://github.com/iptv-org/api) database, with no key needed. Channels are matched by EPG id first, then by name (ignoring "UK:", "HD", "4K" and similar), using the country prefix to tell apart channels that share a name. Matching runs in the background worker and is refreshed weekly.

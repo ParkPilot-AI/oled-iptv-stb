@@ -7,6 +7,7 @@ const INVOKE = new Set([
   'net:status', 'net:scan', 'net:connect', 'net:forget',
   'profiles:list', 'profiles:save', 'profiles:delete', 'profiles:activate',
   'settings:get', 'settings:update',
+  'audio:outputs',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',
   'art:get', 'art:testKey', 'art:refreshLogos',

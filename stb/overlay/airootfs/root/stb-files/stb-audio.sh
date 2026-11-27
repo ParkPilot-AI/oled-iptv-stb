@@ -2,6 +2,8 @@
 # Make the TV's HDMI audio the default output.
 # Override with STB_AUDIO=analog in /etc/environment to keep the headphone jack.
 [ "${STB_AUDIO:-hdmi}" = "hdmi" ] || exit 0
+# The user picked another output in the app (Settings → Audio output): leave it.
+grep -Eqs '"audioDevice"[[:space:]]*:[[:space:]]*"pa:' "$HOME/.config/OLED IPTV/settings.json" && exit 0
 
 # Wait up to 20 s for PipeWire's pulse server.
 i=0
