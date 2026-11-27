@@ -1,0 +1,8 @@
+node_modules/
+dist/
+release/
+test/e2e/media/
+resources/mpv/win/*
+resources/mpv/linux/*
+!resources/mpv/**/README.md
+stb/out/

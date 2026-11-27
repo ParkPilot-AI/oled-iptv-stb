@@ -1,0 +1,18 @@
+#!/bin/sh
+# Never blank or power down the TV from X (the app has its own OLED screensaver).
+xset s off -dpms s noblank
+
+# Compositor: required for the transparent player overlay above mpv.
+picom --config "$HOME/.config/picom/picom.conf" &
+
+# Route audio to the TV over HDMI (runs in background, waits for PipeWire).
+/usr/local/bin/stb-audio &
+
+# The app, restarted automatically if it ever exits or crashes.
+(
+  sleep 1
+  while true; do
+    /opt/oled-iptv/oled-iptv-player >>/tmp/oled-iptv.log 2>&1
+    sleep 2
+  done
+) &

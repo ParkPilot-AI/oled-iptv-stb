@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Kiosk Openbox: no decorations, no menus, no shortcuts that could
+     surprise a remote-control user. -->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <focus>
+    <focusNew>yes</focusNew>
+    <followMouse>no</followMouse>
+  </focus>
+  <placement>
+    <policy>Smart</policy>
+  </placement>
+  <desktops>
+    <number>1</number>
+  </desktops>
+  <keyboard>
+    <chainQuitKey>C-g</chainQuitKey>
+  </keyboard>
+  <mouse/>
+  <applications>
+    <application class="*">
+      <decor>no</decor>
+    </application>
+    <!-- mpv must not take focus: the transparent overlay (always-on-top)
+         keeps keyboard focus and stays above the video. -->
+    <application class="mpv">
+      <decor>no</decor>
+      <focus>no</focus>
+      <fullscreen>yes</fullscreen>
+      <layer>normal</layer>
+    </application>
+  </applications>
+</openbox_config>

@@ -1,0 +1,54 @@
+import { useRef, useState } from 'react';
+import { Focusable } from './Focusable.jsx';
+import { Icon } from './Icons.jsx';
+import { focusFirst } from '../nav/spatial.js';
+
+export const SECTIONS = [
+  { id: 'search', label: 'Search', icon: 'search' },
+  { id: 'home', label: 'Home', icon: 'home' },
+  { id: 'live', label: 'Live TV', icon: 'live' },
+  { id: 'movies', label: 'Movies', icon: 'movie' },
+  { id: 'series', label: 'Series', icon: 'series' },
+  { id: 'favorites', label: 'Favorites', icon: 'star' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
+];
+
+/** Collapsible left rail: icons only until it receives focus, then expands with labels. */
+export function NavRail({ section, onSelect }) {
+  const ref = useRef(null);
+  const [open, setOpen] = useState(false);
+  return (
+    <nav
+      ref={ref}
+      className={`rail ${open ? 'is-open' : ''}`}
+      data-focus-group="rail"
+      data-focus-trap="up,down"
+      onFocus={() => setOpen(true)}
+      onBlur={(e) => !ref.current.contains(e.relatedTarget) && setOpen(false)}
+    >
+      <div className="rail-brand">
+        <span className="rail-dot" />
+        <span className="rail-label">OLED IPTV</span>
+      </div>
+      {SECTIONS.map((s) => (
+        <Focusable
+          key={s.id}
+          focusKey={`rail-${s.id}`}
+          className={`rail-item ${section === s.id ? 'is-active' : ''}`}
+          data-focus-default={section === s.id ? '' : undefined}
+          onSelect={() => {
+            onSelect(s.id);
+            // Move into the newly rendered content.
+            requestAnimationFrame(() => {
+              const main = document.querySelector('.content');
+              if (main) focusFirst(main);
+            });
+          }}
+        >
+          <Icon name={s.icon} size="1.75rem" />
+          <span className="rail-label">{s.label}</span>
+        </Focusable>
+      ))}
+    </nav>
+  );
+}

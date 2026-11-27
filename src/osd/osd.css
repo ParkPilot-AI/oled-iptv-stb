@@ -1,0 +1,161 @@
+/* Overlay above mpv: the page itself must be fully transparent. */
+html.osd-root,
+html.osd-root body,
+html.osd-root #root {
+  background: transparent !important;
+  color-scheme: normal;
+}
+.osd {
+  position: fixed;
+  inset: 0;
+  transition: transform 2s linear;
+  text-shadow: 0 0.1rem 0.4rem rgba(0, 0, 0, 0.8);
+}
+.osd-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2rem;
+  padding: 7rem 5rem 3.5rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.7) 55%, transparent 100%);
+  animation: osd-in 0.18s ease-out;
+}
+@keyframes osd-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+}
+.osd-logo {
+  flex: none;
+  width: 11rem;
+  height: 7.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  background: rgba(18, 18, 18, 0.9);
+  overflow: hidden;
+}
+.osd-logo img {
+  max-width: 85%;
+  max-height: 85%;
+  object-fit: contain;
+}
+.osd-main {
+  flex: 1;
+  min-width: 0;
+}
+.osd-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 2.3rem;
+  font-weight: 650;
+}
+.osd-num {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.osd-pos {
+  font-size: 1.1rem;
+  font-weight: 400;
+}
+.osd-now {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.5rem;
+  font-size: 1.45rem;
+}
+.osd-next {
+  font-size: 1.2rem;
+}
+.osd-times {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+.osd-help {
+  flex: none;
+  font-size: 1rem;
+  max-width: 24rem;
+  text-align: right;
+}
+.osd-vod .osd-help {
+  max-width: 34rem;
+}
+.osd-clock {
+  position: absolute;
+  top: 2.5rem;
+  right: 3.5rem;
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+}
+.osd-digits {
+  position: absolute;
+  top: 2rem;
+  right: 12rem;
+  padding: 0.6rem 1.6rem;
+  border-radius: 0.8rem;
+  background: rgba(0, 0, 0, 0.85);
+  font-size: 3.4rem;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.osd-note {
+  position: absolute;
+  top: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.9rem 1.8rem;
+  border-radius: 0.8rem;
+  background: rgba(0, 0, 0, 0.85);
+  font-size: 1.3rem;
+}
+.osd-info {
+  position: absolute;
+  top: 2.5rem;
+  left: 3.5rem;
+  width: 30rem;
+  padding: 1.4rem 1.8rem;
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.82);
+  font-size: 1.1rem;
+}
+.osd-info h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1.3rem;
+}
+.osd-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.osd-spinner {
+  position: absolute;
+  top: calc(50% - 2rem);
+  left: calc(50% - 2rem);
+}
+.osd-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  padding: 2rem 3rem;
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.9);
+}
+.osd-paused {
+  position: absolute;
+  top: 2.5rem;
+  left: 3.5rem;
+  opacity: 0.55;
+}

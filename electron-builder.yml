@@ -1,0 +1,30 @@
+appId: tv.oled.iptvplayer
+productName: OLED IPTV
+directories:
+  output: release
+files:
+  - dist/**
+  - electron/**
+  - package.json
+# Worker threads must live outside the asar archive to be loadable.
+asarUnpack:
+  - electron/workers/**
+  - electron/xmltv.js
+  - electron/xtream.js
+extraResources:
+  # Drop mpv.exe (+ its DLLs, if any) in resources/mpv/win before running `npm run dist:win`.
+  - from: resources/mpv/${os}
+    to: mpv
+    filter: ["**/*", "!README.md"]
+win:
+  target: [nsis, portable]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  target: [AppImage, deb]
+  category: AudioVideo
+# On Linux the system mpv is used unless one is placed in resources/mpv/linux.
+deb:
+  depends: [mpv]
