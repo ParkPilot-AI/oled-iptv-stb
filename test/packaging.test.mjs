@@ -7,7 +7,8 @@ import path from 'node:path';
 
 test('all worker dependencies are unpacked from asar', () => {
   const yml = fs.readFileSync('electron-builder.yml', 'utf8');
-  const unpack = [...yml.matchAll(/^\s+- (electron\/\S+)$/gm)].map((m) => m[1]);
+  const block = yml.split(/^asarUnpack:\s*$/m)[1].split(/^\S/m)[0];
+  const unpack = [...block.matchAll(/^\s+- (\S+)$/gm)].map((m) => m[1]);
   const covered = (f) => unpack.some((u) => (u.endsWith('/**') ? f.startsWith(u.slice(0, -2)) : f === u));
   const seen = new Set();
   const walk = (f) => {
