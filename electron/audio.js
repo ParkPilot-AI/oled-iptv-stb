@@ -137,3 +137,25 @@ export async function applyOutput(id = 'auto') {
   if (pick) await activateProfile(pick.card, pick.profile);
   return 'auto';
 }
+
+// ---------- volume ----------
+const STEP = 5;
+
+/** System volume (PipeWire default output) — works in menus and during playback. */
+export async function systemVolume(action) {
+  if (!(await hasPactl())) return null;
+  const sink = '@DEFAULT_SINK@';
+  const read = async () => {
+    const v = await run(PACTL, ['get-sink-volume', sink]);
+    const m = await run(PACTL, ['get-sink-mute', sink]);
+    return { volume: Number((/(\d+)%/.exec(v) || [])[1] ?? 0), muted: /yes/i.test(m) };
+  };
+  if (action === 'mute') await run(PACTL, ['set-sink-mute', sink, 'toggle']);
+  else if (action === 'up' || action === 'down') {
+    const cur = await read();
+    const next = Math.max(0, Math.min(100, cur.volume + (action === 'up' ? STEP : -STEP)));
+    await run(PACTL, ['set-sink-volume', sink, `${next}%`]);
+    if (action === 'up' && cur.muted) await run(PACTL, ['set-sink-mute', sink, '0']);
+  }
+  return read();
+}

@@ -18,6 +18,14 @@ import { Player } from './player.js';
 import { getArtwork, testTmdbKey, clearArtworkCache } from './artwork.js';
 import { resolveMpvBinary } from './mpv.js';
 import * as audio from './audio.js';
+import { PICTURE_DEFAULTS } from './mpvprops.js';
+
+// Settings that change what's playing right now.
+const LIVE_KEYS = new Set([
+  'audioDevice', 'subMode', 'subLang', 'subSize', 'subBackground',
+  ...Object.keys(PICTURE_DEFAULTS),
+  'audioDelayMs', 'nightMode', 'passthrough', 'speakers', 'audioLang',
+]);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -68,7 +76,7 @@ async function createMainWindow() {
     backgroundColor: '#000000',
     fullscreen: settings.startFullscreen,
     autoHideMenuBar: true,
-    title: 'OLED IPTV',
+    title: 'ONYX',
     webPreferences,
   });
   lockDown(mainWin);
@@ -236,6 +244,19 @@ const handlers = {
     };
   },
   'app:quit': () => app.quit(),
+  'system:poweroff': async () => {
+    if (!hasUpdater()) return app.quit();
+    player.dispose();
+    store.flushDocs();
+    // Newer helpers have "poweroff"; otherwise logind lets the logged-in TV user shut down.
+    const viaHelper = await new Promise((res) =>
+      execFile('sudo', ['-n', UPDATER, 'poweroff'], { timeout: 10000 }, (err) => res(!err))
+    );
+    if (viaHelper) return;
+    await new Promise((res, rej) =>
+      execFile('systemctl', ['poweroff'], { timeout: 10000 }, (err, _o, stderr) => (err ? rej(new Error(String(stderr || err.message).trim())) : res()))
+    );
+  },
   'app:restart': () => {
     // On the set-top box an autostart loop relaunches the app; elsewhere relaunch ourselves.
     if (!hasUpdater()) app.relaunch();
@@ -273,8 +294,17 @@ const handlers = {
   'settings:update': async (patch) => {
     if ('audioDevice' in patch) await audio.applyOutput(patch.audioDevice);
     const s = await store.updateSettings(patch);
-    if (['audioDevice', 'subMode', 'subLang', 'subSize', 'subBackground'].some((k) => k in patch)) await player.applySettings(s);
+    if (Object.keys(patch).some((k) => LIVE_KEYS.has(k))) await player.applySettings(s);
     return s;
+  },
+  'volume:change': async ({ action }) => {
+    let r = await audio.systemVolume(action).catch(() => null);
+    if (!r && player.mpv) r = await player.volume(action); // Windows/macOS: mpv's own volume
+    if (r) {
+      sendMain('volume:changed', r);
+      if (osdWin && !osdWin.isDestroyed()) osdWin.webContents.send('volume:changed', r);
+    }
+    return r;
   },
   'audio:outputs': async () => {
     const s = await store.getSettings();
@@ -341,6 +371,8 @@ app.whenReady().then(async () => {
   setTimeout(applySavedAudio, 4000);
   setTimeout(applySavedAudio, 25000);
 });
+
+for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => app.quit());
 
 app.on('before-quit', () => {
   player.dispose();

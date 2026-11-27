@@ -128,7 +128,7 @@ function UpdateModal({ st, onClose, onFinished }) {
                 <b>System packages:</b> {st?.system > 0 ? `${st.system} update${st.system === 1 ? '' : 's'} available` : 'up to date'}
               </li>
               <li>
-                <b>OLED IPTV app:</b>{' '}
+                <b>ONYX app:</b>{' '}
                 {appNew ? `${st.appInstalled} → ${st.appLatest}` : st?.appLatest ? `${st.appInstalled} (latest)` : st?.repo ? 'version check unavailable (token?)' : 'no update source set'}
               </li>
             </ul>

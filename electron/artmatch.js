@@ -83,7 +83,9 @@ export function buildLogoMatcher(channels, logos) {
 
 /** "EN - The Matrix (1999) [4K]" → { title: 'The Matrix', year: '1999' } */
 export function cleanTitle(raw = '') {
-  let s = String(raw).replace(/^\s*(?:\[[^\]]*\]|\|[^|]*\||[A-Z]{2,3}\s*[-:|]\s+)+/, '');
+  // Provider prefixes: "EN - ", "UK: ", "|EN| ", "[4K] ", "4K-NF - ", "D+ | ", "EN|"…
+  // ":" only after a 2-letter code, so "CSI: Vegas" / "M3GAN: …" keep their names.
+  let s = String(raw).replace(/^\s*(?:\[[^\]]*\]|\|[^|]*\||[A-Z0-9+]{1,6}(?:-[A-Z0-9+]{1,6})?(?:\s*\|\s*|\s+-\s+|-\s+)|[A-Z]{2}:\s*)+/, '');
   let year = '';
   const paren = /\((19\d{2}|20\d{2})\)/.exec(s);
   if (paren) {

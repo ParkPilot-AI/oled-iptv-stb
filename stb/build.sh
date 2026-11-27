@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the OLED IPTV set-top-box installer ISO.
+# Builds the ONYX set-top-box installer ISO.
 # Runs on any Linux PC with Docker (e.g. your Xubuntu machine):
 #   sudo apt install -y docker.io
 #   sudo ./stb/build.sh

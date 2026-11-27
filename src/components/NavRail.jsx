@@ -1,3 +1,4 @@
+import { Mark, Wordmark } from './Logo.jsx';
 import { useRef, useState } from 'react';
 import { Focusable } from './Focusable.jsx';
 import { Icon } from './Icons.jsx';
@@ -27,8 +28,8 @@ export function NavRail({ section, onSelect }) {
       onBlur={(e) => !ref.current.contains(e.relatedTarget) && setOpen(false)}
     >
       <div className="rail-brand">
-        <span className="rail-dot" />
-        <span className="rail-label">OLED IPTV</span>
+        <Mark className="rail-mark" height="1.5rem" />
+        <Wordmark className="rail-label" height="1.5rem" />
       </div>
       {SECTIONS.map((s) => (
         <Focusable

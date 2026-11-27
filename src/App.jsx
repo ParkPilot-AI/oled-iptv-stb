@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useRef } from 'react';
-import { useStore, setState, boot, toggleFavorite, favRegistry, confirmDialog, activateProfile, getState } from './lib/store.js';
+import { useStore, setState, boot, toggleFavorite, favRegistry, confirmDialog, activateProfile, getState, powerOff } from './lib/store.js';
 import { api } from './lib/api.js';
-import { dispatchKey, useBack, useKeyHandler } from './nav/keys.js';
+import { dispatchKey, useBack, useKeyHandler, keyAction } from './nav/keys.js';
+import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';
 import { NavRail } from './components/NavRail.jsx';
 import { ConfirmHost, ToastHost, usePixelShift } from './components/Modal.jsx';
@@ -46,6 +47,12 @@ function MainApp() {
 
   useEffect(() => {
     const onKey = (e) => {
+      const act = keyAction(e);
+      if (act === 'volUp' || act === 'volDown' || act === 'mute') {
+        e.preventDefault();
+        changeVolume(act);
+        return;
+      }
       if (idleRef.current) {
         // First key only wakes the screen.
         e.preventDefault();
@@ -77,6 +84,7 @@ function MainApp() {
       {bootState === 'ready' && <Shell />}
       <ConfirmHost />
       <ToastHost />
+      <VolumeHud />
       {idle && <Screensaver />}
     </div>
   );
@@ -132,7 +140,7 @@ function Shell() {
         focusByKey(`rail-${getState().section}`) || focusGroup('rail');
         return true;
       }
-      confirmDialog({ title: 'Exit OLED IPTV?', confirmLabel: 'Exit', danger: true }).then((ok) => ok && api.invoke('app:quit'));
+      powerOff();
       return true;
     },
     { priority: -100 }

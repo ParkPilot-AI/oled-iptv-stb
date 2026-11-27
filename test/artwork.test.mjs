@@ -62,3 +62,15 @@ test('pickTmdbLogo prefers English PNG with votes', () => {
   );
   assert.equal(pickTmdbLogo([]), null);
 });
+
+test('provider prefixes are stripped without eating real titles', async () => {
+  const { cleanTitle } = await import('../electron/artmatch.js');
+  const t = (s) => cleanTitle(s).title;
+  assert.equal(t('4K-NF - Wednesday'), 'Wednesday');
+  assert.equal(t('D+ | The Mandalorian'), 'The Mandalorian');
+  assert.equal(t('EN|Oppenheimer (2023)'), 'Oppenheimer');
+  assert.equal(t('NF: Squid Game'), 'Squid Game');
+  assert.equal(t('9-1-1'), '9-1-1');
+  assert.equal(t('X-Men: Days of Future Past'), 'X-Men: Days of Future Past');
+  assert.equal(t('CSI: Vegas'), 'CSI: Vegas');
+});

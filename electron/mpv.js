@@ -40,6 +40,7 @@ export const INPUT_CONF = [
   ['NEXT', 'MediaTrackNext'], ['PREV', 'MediaTrackPrevious'], ['STOP', 'MediaStop'],
   ['f', 'f'], ['F', 'f'], ['i', 'i'], ['I', 'i'], ['a', 'a'], ['s', 's'],
   ...'0123456789'.split('').map((d) => [d, d]),
+  ['VOLUME_UP', 'AudioVolumeUp'], ['VOLUME_DOWN', 'AudioVolumeDown'], ['MUTE', 'AudioVolumeMute'],
   ['CLOSE_WIN', 'Escape'],
   ['MBTN_LEFT', 'ignore'], ['MBTN_LEFT_DBL', 'ignore'], ['WHEEL_UP', 'ignore'], ['WHEEL_DOWN', 'ignore'],
 ]
@@ -57,7 +58,7 @@ export function buildMpvArgs({ ipcPath, inputConf, hwdec = 'auto-safe', deinterl
     '--keep-open=no',
     '--fullscreen',
     '--border=no',
-    '--title=OLED IPTV Player',
+    '--title=ONYX',
     `--hwdec=${hwdec}`,
     '--vo=gpu',
     '--osc=no',

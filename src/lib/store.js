@@ -198,7 +198,7 @@ export const favKey = (item) => `${item.kind}:${item.id}`;
 // ---------- progress / continue watching ----------
 export function continueWatching(progress) {
   const list = Object.values(progress)
-    .filter((p) => !p.watched && p.pos > 30)
+    .filter((p) => p.item && !p.watched && (p.pos > 30 || p.upNext))
     .sort((a, b) => b.updatedAt - a.updatedAt);
   const seen = new Set();
   return list.filter((p) => {
@@ -250,5 +250,24 @@ export async function resumeEntry(entry) {
     return play(idx >= 0 ? list : [it], Math.max(0, idx));
   } catch {
     return play([it]);
+  }
+}
+
+// ---------- power ----------
+/** "Power Off": shuts the set-top box down (closes the app on a normal PC). */
+export async function powerOff() {
+  const info = await api.invoke('app:info').catch(() => ({}));
+  const box = !!info?.updater;
+  const ok = await confirmDialog({
+    title: 'Power off?',
+    message: box ? 'The box will shut down. Press its power button to turn it back on.' : 'ONYX will close.',
+    confirmLabel: 'Power Off',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api.invoke('system:poweroff');
+  } catch (e) {
+    toast(`Couldn't power off: ${e.message}`, 6000);
   }
 }

@@ -33,6 +33,9 @@ function setup({ latest = '2026.11.27-new', corrupt = false, withApp = true } = 
   fs.writeFileSync(path.join(build, 'oled-iptv-player'), '#!/bin/sh\necho new', { mode: 0o755 });
   fs.writeFileSync(path.join(build, 'chrome-sandbox'), 'x');
   fs.writeFileSync(path.join(build, 'stb-version.txt'), `${latest}\n`);
+  fs.mkdirSync(path.join(build, 'stb-system'));
+  fs.writeFileSync(path.join(build, 'stb-system', 'stb-update'), '#!/bin/bash\n# new helper\n');
+  fs.writeFileSync(path.join(build, 'stb-system', 'nm-stb.conf'), '[device]\n');
   const tarball = path.join(dir, 'app.tar.zst');
   execFileSync('tar', ['-C', build, '-I', 'zstd', '-cf', tarball, '.']);
   const tarBuf = fs.readFileSync(tarball);
@@ -65,6 +68,7 @@ function setup({ latest = '2026.11.27-new', corrupt = false, withApp = true } = 
         STB_GITHUB_API: `http://127.0.0.1:${server.address().port}`,
         STB_UPDATE_LOG: path.join(dir, 'update.log'),
         STB_LOCK: path.join(dir, 'lock'),
+        STB_ROOT: path.join(dir, 'root'),
       };
       fs.writeFileSync(conf, 'REPO="me/box"\nGITHUB_TOKEN="tok123"\n');
       // The script reads /etc/stb/update.conf; point it at ours by rewriting the path in a copy.
@@ -109,6 +113,10 @@ test('run updates packages, swaps the app atomically and reports', { skip }, asy
   assert.equal(fs.readFileSync(path.join(ctx.app, 'stb-version.txt'), 'utf8').trim(), '2026.11.27-new');
   assert.equal(fs.readFileSync(path.join(ctx.app + '.old', 'stb-version.txt'), 'utf8').trim(), '2026.11.01-old');
   assert.ok(fs.statSync(path.join(ctx.app, 'chrome-sandbox')).mode & 0o4000, 'setuid sandbox');
+  // Box helpers shipped inside the app are installed too.
+  assert.match(fs.readFileSync(path.join(ctx.dir, 'root/usr/local/sbin/stb-update'), 'utf8'), /new helper/);
+  assert.ok(fs.statSync(path.join(ctx.dir, 'root/usr/local/sbin/stb-update')).mode & 0o100, 'helper executable');
+  assert.ok(fs.existsSync(path.join(ctx.dir, 'root/etc/NetworkManager/conf.d/stb.conf')));
 });
 
 test('corrupt download is rejected and the old app is kept', { skip }, async () => {

@@ -8,6 +8,8 @@ const INVOKE = new Set([
   'profiles:list', 'profiles:save', 'profiles:delete', 'profiles:activate',
   'settings:get', 'settings:update',
   'audio:outputs',
+  'system:poweroff',
+  'volume:change',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',
   'art:get', 'art:testKey', 'art:refreshLogos',
@@ -16,7 +18,7 @@ const INVOKE = new Set([
 ]);
 const EVENTS = new Set([
   'catalog:progress', 'catalog:updated', 'epg:progress', 'epg:updated',
-  'player:closed', 'player:state', 'player:key', 'system:update:progress',
+  'player:closed', 'player:state', 'player:key', 'system:update:progress', 'volume:changed',
 ]);
 
 contextBridge.exposeInMainWorld('iptv', {

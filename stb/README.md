@@ -1,6 +1,6 @@
-# OLED IPTV set-top box (Arch Linux auto-installer)
+# ONYX set-top box (Arch Linux auto-installer)
 
-This kit builds a USB installer. It erases the OptiPlex's internal disk and installs a minimal Arch Linux system that boots straight into OLED IPTV, with no desktop or login screen.
+This kit builds a USB installer. It erases the OptiPlex's internal disk and installs a minimal Arch Linux system that boots straight into ONYX, with no desktop or login screen.
 
 **What the finished box runs**
 
@@ -47,7 +47,7 @@ You can also use balenaEtcher.
    - time zone, keyboard layout and box name (Enter accepts the defaults: Europe/London, gb),
    - a **password** for the maintenance user `tv`.
 3. Wait about 5–10 minutes while it downloads and installs. Remove the USB stick when asked, then press Enter.
-4. The box reboots into OLED IPTV. Add your provider on the first screen.
+4. The box reboots into ONYX. Add your provider on the first screen.
 
 If anything fails, the error is shown along with the log at `/root/stb-install.log`. Type `bash /root/stb-install.sh` to try again.
 
@@ -61,7 +61,7 @@ If anything fails, the error is shown along with the log at `/root/stb-install.l
 | Change Wi-Fi | **Settings → System → Wi-Fi**: scan, pick a network, type the password with the remote. (Shell: `nmcli dev wifi connect "NewNetwork" password "..."`.) |
 | Keep audio on the headphone jack | `echo STB_AUDIO=analog | sudo tee -a /etc/environment` |
 | Logs | `/tmp/oled-iptv.log` (app), `/tmp/xsession.log` (X) |
-| Update everything | **Settings → System → Update system**. One button updates the Arch packages (`pacman -Syu`) and the OLED IPTV app (from the newest GitHub release, checksum-verified, old version kept in `/opt/oled-iptv.old`). The app then restarts; a reboot is offered if a new kernel was installed. Log: `/var/log/stb-update.log` |
+| Update everything | **Settings → System → Update system**. One button updates the Arch packages (`pacman -Syu`) and the ONYX app (from the newest GitHub release, checksum-verified, old version kept in `/opt/oled-iptv.old`). The app then restarts; a reboot is offered if a new kernel was installed. Log: `/var/log/stb-update.log` |
 | Check hardware decoding | Press **I** while playing. *HW decoding* should say `vaapi` |
 
 ## 5. USB Wi-Fi adapters

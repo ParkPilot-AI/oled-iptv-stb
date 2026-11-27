@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { useStore, activateProfile, refreshProfiles, confirmDialog, getState, setState } from '../lib/store.js';
+import { useStore, activateProfile, refreshProfiles, confirmDialog, getState, setState, powerOff } from '../lib/store.js';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { focusFirst } from '../nav/spatial.js';
 import { useBack } from '../nav/keys.js';
+import { Wordmark } from '../components/Logo.jsx';
 import { NetworkRow } from '../components/NetworkSettings.jsx';
 import { UpdateRow } from '../components/SystemUpdate.jsx';
 
@@ -29,15 +30,15 @@ export function Login() {
       setState({ boot: 'ready' });
       return true;
     }
-    confirmDialog({ title: 'Exit OLED IPTV?', confirmLabel: 'Exit', danger: true }).then((ok) => ok && api.invoke('app:quit'));
+    powerOff();
     return true;
   });
 
   return (
     <div className="login" ref={ref}>
       <header className="login-head">
-        <span className="rail-dot" />
-        <h1>OLED IPTV</h1>
+        <h1 className="sr-only">ONYX</h1>
+        <Wordmark height="3.6rem" />
       </header>
       {editing ? (
         <ProfileForm

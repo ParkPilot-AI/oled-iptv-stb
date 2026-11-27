@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OLED IPTV set-top box installer (runs in the live USB environment).
+# ONYX set-top box installer (runs in the live USB environment).
 # Wipes ONE chosen disk and installs: minimal Arch + Intel VA-API + mpv +
 # X11/Openbox/picom kiosk session that auto-starts the app on boot.
 set -uo pipefail
@@ -28,7 +28,7 @@ clear
 printf '\n\n'
 indent <<EOF
 ${c_b}┌──────────────────────────────────────────────┐
-│        OLED IPTV  ·  set-top box installer    │
+│        ONYX  ·  set-top box installer        │
 └──────────────────────────────────────────────┘${c_0}
 This will ERASE one disk and turn this PC into a dedicated
 IPTV box that boots straight into the player.
@@ -244,7 +244,7 @@ else
 fi
 
 # ---------------------------------------------------------------- app
-say "Installing OLED IPTV"
+say "Installing ONYX"
 mkdir -p "$MNT/opt/oled-iptv"
 tar -C "$MNT/opt/oled-iptv" -I zstd -xf "$PAYLOAD" || die "Could not unpack the app"
 chown -R root:root "$MNT/opt/oled-iptv"
@@ -302,7 +302,7 @@ ln -sf /run/systemd/resolve/stub-resolv.conf "$MNT/etc/resolv.conf"
 # Bootloader: no menu, quiet boot straight into the box.
 install -Dm644 "$FILES/loader.conf" "$MNT/boot/loader/loader.conf"
 cat > "$MNT/boot/loader/entries/iptv.conf" <<EOF
-title   OLED IPTV
+title   ONYX
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
 options root=PARTUUID=$ROOT_UUID rw quiet loglevel=3 rd.udev.log_level=3 systemd.show_status=false vt.global_cursor_default=0 i915.fastboot=1 nowatchdog usbcore.autosuspend=-1
@@ -343,7 +343,7 @@ say "Done!"
 indent <<EOF
 
 ${c_b}Remove the USB stick, then press Enter to reboot.${c_0}
-The box will boot straight into OLED IPTV. Add your provider
+The box will boot straight into ONYX. Add your provider
 on the first screen.
 
 Maintenance: Ctrl+Alt+F2 → log in as 'tv'.  (Ctrl+Alt+F1 returns.)

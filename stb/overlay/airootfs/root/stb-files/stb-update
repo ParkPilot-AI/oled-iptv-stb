@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OLED IPTV set-top box updater (runs as root via a narrow sudoers rule).
+# ONYX set-top box updater (runs as root via a narrow sudoers rule).
 #   stb-update check   → one JSON line: pending system updates + app versions
 #   stb-update run     → update Arch packages, then the app; progress on stdout
 #   stb-update reboot  → reboot the box
@@ -55,6 +55,21 @@ cmd_check() {
     '{system: $system, appInstalled: $installed, appLatest: $latest, repo: $repo, hasToken: $token}'
 }
 
+# Keep the box's own helpers in step with the app (shipped in the app package).
+install_system_files() {
+  local src=$1
+  [[ -d $src ]] || return 0
+  local p="${STB_ROOT:-}" # test hook: install under a fake root
+  put() { # atomic replace, so a running copy of this script keeps working
+    [[ -f $1 ]] || return 0
+    cmp -s "$1" "$p$2" && return 0
+    install -D -m "$3" "$1" "$p$2.new" && mv -f "$p$2.new" "$p$2"
+  }
+  put "$src/stb-update" /usr/local/sbin/stb-update 755
+  put "$src/stb-audio.sh" /usr/local/bin/stb-audio 755
+  put "$src/nm-stb.conf" /etc/NetworkManager/conf.d/stb.conf 644
+}
+
 update_app() {
   local rel latest
   rel=$(latest_release) || { say "STEP App: could not reach GitHub (check network / token) — skipped"; return 0; }
@@ -82,6 +97,7 @@ update_app() {
   rm -rf "$APP.old"
   [[ -d $APP ]] && mv "$APP" "$APP.old"
   mv "$new" "$APP"
+  install_system_files "$APP/stb-system"
   say "APP_UPDATED $latest"
 }
 
@@ -185,5 +201,6 @@ case ${1:-} in
   check) cmd_check ;;
   run) cmd_run ;;
   reboot) systemctl reboot ;;
-  *) echo "usage: stb-update check|run|reboot|wifi ..." >&2; exit 2 ;;
+  poweroff) systemctl poweroff ;;
+  *) echo "usage: stb-update check|run|reboot|poweroff|wifi ..." >&2; exit 2 ;;
 esac

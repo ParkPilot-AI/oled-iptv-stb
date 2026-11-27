@@ -7,7 +7,7 @@ import { VirtualList } from '../components/VirtualGrid.jsx';
 import { DetailOverlay, useDetailInfo } from './MovieDetail.jsx';
 import { focusFirst } from '../nav/spatial.js';
 import { epLabel, humanDuration, duration } from '../lib/format.js';
-import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
+import { useArt, useArtSettings, artChoices } from '../lib/art.js';
 
 export function SeriesDetail({ item }) {
   const { info, error } = useDetailInfo('series:info', item);
@@ -19,8 +19,8 @@ export function SeriesDetail({ item }) {
 
   const mode = useArtSettings();
   const art = useArt(info ? { ...item, tmdbId: info.tmdbId } : item, !!info || !!error);
-  const backdrop = chooseArt(mode, info?.backdrop, art?.backdrop);
-  const poster = chooseArt(mode, info?.icon || item.icon, art?.poster);
+  const backdrop = info?.backdrop || art?.backdrop ? artChoices(mode, info?.backdrop, art?.backdrop) : null;
+  const poster = artChoices(mode, info?.icon || item.icon, art?.poster);
 
   const playlist = useMemo(() => (info ? episodePlaylist(info, item) : []), [info, item]);
 

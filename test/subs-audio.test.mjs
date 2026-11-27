@@ -63,3 +63,20 @@ test('mpv device list parsing', () => {
 `;
   assert.deepEqual(outputsFromMpvHelp(help).map((x) => x.label), ['LG TV SSCR2 (Intel(R) Display Audio)', 'Speakers (Realtek(R) Audio)']);
 });
+
+test('picture and sound settings map to mpv properties', async () => {
+  const { videoProps, audioProps } = await import('../electron/mpvprops.js');
+  const v = videoProps({ brightness: 80, aspect: 'zoom', upscaling: 'high', deband: true });
+  assert.equal(v.brightness, 50); // clamped
+  assert.equal(v.panscan, 1);
+  assert.equal(v.scale, 'ewa_lanczossharp');
+  assert.equal(videoProps({ aspect: 'stretch' }).keepaspect, false);
+  assert.equal(videoProps({}).deinterlace, 'no');
+  const a = audioProps({ audioDelayMs: -150, nightMode: 'night', passthrough: true, speakers: 'stereo', audioLang: 'en' });
+  assert.equal(a['audio-delay'], -0.15);
+  assert.match(a.af, /acompressor/);
+  assert.match(a['audio-spdif'], /eac3/);
+  assert.equal(a['audio-channels'], 'stereo');
+  assert.equal(a.alang, 'en,eng');
+  assert.equal(audioProps({}).af, '');
+});

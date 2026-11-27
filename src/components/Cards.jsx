@@ -3,7 +3,7 @@ import { Focusable } from './Focusable.jsx';
 import { Icon } from './Icons.jsx';
 import { imgUrl } from '../lib/api.js';
 import { useStore, isFavorite } from '../lib/store.js';
-import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
+import { useArt, useArtSettings, artChoices } from '../lib/art.js';
 
 // One shared IntersectionObserver for all lazy images.
 let io = null;
@@ -29,20 +29,23 @@ function observe(el, cb) {
   };
 }
 
+/** Lazy image. `src` may be a list: each is tried in turn if the previous one fails to load. */
 export const LazyImg = memo(function LazyImg({ src, width = 480, alt = '', className = '', fallback }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const url = imgUrl(src, width);
+  const list = (Array.isArray(src) ? src : [src]).filter(Boolean);
+  const sig = list.join('\n');
+  const [failedCount, setFailedCount] = useState(0);
+  const url = imgUrl(list[failedCount], width);
+  useEffect(() => setFailedCount(0), [sig]);
   useEffect(() => {
-    setFailed(false);
     if (!url || !ref.current) return;
     return observe(ref.current, () => setVisible(true));
   }, [url]);
   return (
     <div ref={ref} className={`lazyimg ${className}`}>
-      {url && visible && !failed ? (
-        <img src={url} alt={alt} decoding="async" draggable={false} onError={() => setFailed(true)} />
+      {url && visible ? (
+        <img key={url} src={url} alt={alt} decoding="async" draggable={false} onError={() => setFailedCount((n) => n + 1)} />
       ) : (
         <div className="lazyimg-fallback">{fallback}</div>
       )}
@@ -76,8 +79,8 @@ export function qualityTags(name = '') {
 export const PosterCard = memo(function PosterCard({ item, onSelect, progress, subtitle, caption = false, focusKey, ...rest }) {
   const fav = useStore((s) => isFavorite(s.favorites, item));
   const mode = useArtSettings();
-  const art = useArt(item, mode === 'prefer' || !item.icon);
-  const poster = chooseArt(mode, item.icon, art?.poster);
+  const art = useArt(item);
+  const poster = artChoices(mode, item.icon, art?.poster);
   return (
     <Focusable className={`poster-card ${caption ? 'has-caption' : ''}`} onSelect={onSelect} favItem={item} focusKey={focusKey} {...rest}>
       <div className="card-frame">
@@ -114,7 +117,7 @@ export const LandscapeCard = memo(function LandscapeCard({ item, title, badge, p
   const mode = useArtSettings();
   const art = useArt(item);
   // 16:9 needs wide art: episode still → TMDB backdrop → provider poster.
-  const src = (item.kind === 'episode' && item.icon) || chooseArt(mode, '', art?.backdrop) || item.icon || item.seriesIcon;
+  const src = [item.kind === 'episode' && item.icon, mode !== 'off' && art?.backdrop, item.icon, item.seriesIcon, mode !== 'off' && art?.poster];
   return (
     <Focusable className="landscape-card" onSelect={onSelect} favItem={item.kind === 'episode' ? undefined : item} {...rest}>
       <div className="card-frame">

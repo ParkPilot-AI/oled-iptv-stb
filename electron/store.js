@@ -137,10 +137,25 @@ export const DEFAULT_SETTINGS = {
   accent: '#3B82F6',
   overscan: 0, // per-edge safe margin for TVs that crop the picture
   tmdbKey: '', // free key from themoviedb.org (v3 key or v4 read token)
-  artSource: 'missing', // movies/series artwork: missing | prefer | off
+  artSource: 'prefer', // movies/series artwork: prefer (TMDB first) | missing (provider first) | off
   logoSource: 'missing', // channel logos from iptv-org: missing | prefer | off
   audioDevice: 'auto', // auto | pa:<card>|<profile> (PipeWire) | mpv:<device>
-  subMode: 'forced', // off | on | forced (only foreign-dialogue tracks)
+  subMode: 'off', // off | on
+  // Picture (mpv video equalizer etc.)
+  brightness: 0,
+  contrast: 0,
+  saturation: 0,
+  gamma: 0,
+  aspect: 'auto', // auto | 16:9 | 4:3 | 21:9 | zoom | stretch
+  upscaling: 'standard', // fast | standard | high
+  deband: false,
+  toneMapping: 'auto', // auto | natural | bright (HDR → SDR)
+  // Sound
+  audioLang: 'auto',
+  audioDelayMs: 0,
+  nightMode: 'off', // off | night | level
+  passthrough: false, // Dolby/DTS bitstream to a soundbar/AV receiver
+  speakers: 'auto', // auto | stereo
   subLang: 'en',
   subSize: 'medium', // small | medium | large | xlarge
   subBackground: 'box', // box | outline
@@ -149,7 +164,16 @@ const settingsFile = () => path.join(dataDir(), 'settings.json');
 let settingsCache = null;
 
 export async function getSettings() {
-  settingsCache ??= { ...DEFAULT_SETTINGS, ...(await readJson(settingsFile(), {})) };
+  if (!settingsCache) {
+    const saved = await readJson(settingsFile(), {});
+    // v2 defaults: TMDB artwork first, subtitles off (earlier builds defaulted otherwise).
+    if (!saved.v2) {
+      if (saved.artSource === 'missing') delete saved.artSource;
+      if (saved.subMode && saved.subMode !== 'on') delete saved.subMode;
+      saved.v2 = true;
+    }
+    settingsCache = { ...DEFAULT_SETTINGS, ...saved };
+  }
   return settingsCache;
 }
 export async function updateSettings(patch) {
@@ -172,10 +196,15 @@ export async function getDoc(profileId, name) {
   return docCache.get(key).data;
 }
 
+/** The in-memory copy of a document, if loaded (synchronous). */
+export function peekDoc(profileId, name) {
+  return docCache.get(`${profileId}/${name}`)?.data ?? null;
+}
+
 /** Replace a document in memory and persist it (debounced). */
 export async function setDoc(profileId, name, data) {
-  await getDoc(profileId, name);
   const key = `${profileId}/${name}`;
+  if (!docCache.has(key)) await getDoc(profileId, name); // already loaded → update synchronously
   const entry = docCache.get(key);
   entry.data = data;
   clearTimeout(entry.timer);

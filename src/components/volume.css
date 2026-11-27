@@ -1,0 +1,35 @@
+/* Volume indicator — solid, top-right, out of the way of subtitles. */
+.volume-hud {
+  position: fixed;
+  top: calc(2.5rem + 100vh * var(--safe, 0));
+  right: calc(3rem + 100vw * var(--safe, 0));
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.4rem;
+  border-radius: 1rem;
+  background: #0c0c0e;
+  border: 1px solid #1a1a1e;
+  color: #eaeaea;
+  font-size: 1.3rem;
+  font-weight: 600;
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.8);
+}
+.volume-bar {
+  width: 14rem;
+  height: 0.45rem;
+  border-radius: 1rem;
+  background: #2a2a30;
+  overflow: hidden;
+}
+.volume-bar > div {
+  height: 100%;
+  background: var(--accent, #3b82f6);
+  transition: width 0.12s;
+}
+.volume-num {
+  min-width: 3.4rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

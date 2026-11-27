@@ -40,6 +40,15 @@ export function keyAction(e) {
       return 'prev';
     case 'MediaStop':
       return 'stop';
+    case 'AudioVolumeUp':
+    case 'VolumeUp':
+      return 'volUp';
+    case 'AudioVolumeDown':
+    case 'VolumeDown':
+      return 'volDown';
+    case 'AudioVolumeMute':
+    case 'VolumeMute':
+      return 'mute';
     case 'f':
     case 'F':
       return 'fav';

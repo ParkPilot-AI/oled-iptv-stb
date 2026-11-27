@@ -22,7 +22,14 @@ let active = 0;
 const queue = [];
 
 async function loadCache() {
-  cache ??= await readJson(cacheFile(), {});
+  if (!cache) {
+    cache = await readJson(cacheFile(), {});
+    // v2: better title matching — retry everything that previously wasn't found.
+    if (cache.__v !== 2) {
+      for (const k of Object.keys(cache)) if (cache[k]?.miss) delete cache[k];
+      cache.__v = 2;
+    }
+  }
   return cache;
 }
 function persist() {

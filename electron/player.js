@@ -6,7 +6,8 @@ import fsp from 'node:fs/promises';
 import { Mpv, buildMpvArgs, makeIpcPath, resolveMpvBinary, INPUT_CONF } from './mpv.js';
 import { streamUrl } from './xtream.js';
 import { pickSubtitle, subStyleProps } from './subs.js';
-import { getCredentials, getSettings, getDoc, setDoc, dataDir } from './store.js';
+import { videoProps, audioProps } from './mpvprops.js';
+import { getCredentials, getSettings, getDoc, setDoc, peekDoc, dataDir } from './store.js';
 
 const PROGRESS_EVERY_MS = 10000;
 const WATCHED_RATIO = 0.92;
@@ -70,7 +71,8 @@ export class Player {
   async _applyOutputAndStyle(mpv, settings) {
     const dev = String(settings.audioDevice || 'auto');
     await mpv.set('audio-device', dev.startsWith('mpv:') ? dev.slice(4) : 'auto').catch(() => {});
-    for (const [k, v] of Object.entries(subStyleProps(settings))) await mpv.set(k, v).catch(() => {});
+    const props = { ...subStyleProps(settings), ...videoProps(settings), ...audioProps(settings) };
+    for (const [k, v] of Object.entries(props)) await mpv.set(k, v).catch((e) => console.warn(`mpv ${k}:`, e.message));
   }
 
   async _applySubtitleChoice() {
@@ -87,6 +89,14 @@ export class Player {
     if (!this.mpv) return;
     await this._applyOutputAndStyle(this.mpv, settings);
     await this._applySubtitleChoice();
+  }
+
+  async volume(action) {
+    if (!this.mpv) return null;
+    if (action === 'mute') await this.mpv.command('cycle', 'mute');
+    else await this.mpv.command('add', 'volume', action === 'up' ? 5 : -5);
+    const [volume, muted] = await Promise.all([this.mpv.get('volume'), this.mpv.get('mute')]);
+    return { volume: Math.round(Math.min(100, volume)), muted: !!muted };
   }
 
   /** Start a session. items: [{kind,id,name,ext,...}], index: start position. */
@@ -222,8 +232,14 @@ export class Player {
     const s = this.session;
     const item = s.items[s.index];
     if (item.kind === 'live') return this._onError('stream ended');
+    // Providers often just close the connection mid-film, which mpv reports as
+    // end-of-file. Only treat it as finished near the real end; otherwise reconnect.
+    const st = this.state;
+    const nearEnd = st.dur > 0 ? st.pos >= st.dur * WATCHED_RATIO || st.dur - st.pos < 90 : false;
+    if (!nearEnd) return this._onError('connection dropped');
     this._saveProgress({ watched: true });
     if (item.kind === 'episode' && s.index + 1 < s.items.length) {
+      this._markUpNext(s.items[s.index + 1]);
       s.index++;
       await this._loadCurrent({ resume: false, autoNext: true });
     } else {
@@ -274,17 +290,35 @@ export class Player {
     const st = this.state;
     if (!s || !st || st.kind === 'live' || !st.pos) return;
     this.lastProgressSave = Date.now();
-    const dur = st.dur || 0;
+    const dur = st.dur > st.pos ? st.dur : 0; // ignore nonsense durations from some streams
     const key = `${st.kind}:${st.item.id}`;
-    s.progress[key] = {
+    const entry = {
       key,
       pos: Math.floor(st.pos),
       dur: Math.floor(dur),
-      watched: watched || (dur > 0 && st.pos / dur >= WATCHED_RATIO),
+      watched: watched || (dur > 120 && st.pos / dur >= WATCHED_RATIO),
       updatedAt: Date.now(),
       item: st.item,
     };
-    setDoc(s.profileId, 'progress', s.progress);
+    // Always update the *current* document (the UI may have replaced it, e.g. "Play from start").
+    const doc = peekDoc(s.profileId, 'progress') || s.progress;
+    if (doc[key]?.upNext && !entry.watched && entry.pos <= 30) entry.upNext = true; // still "up next"
+    // Stopping right after the end must not un-finish it.
+    if (doc[key]?.watched && !entry.watched && Math.abs(doc[key].pos - entry.pos) < 10) entry.watched = true;
+    const next = { ...doc, [key]: entry };
+    s.progress = next;
+    setDoc(s.profileId, 'progress', next).catch((e) => console.error('progress save failed', e));
+  }
+
+  /** Finished an episode: the next one shows in Continue Watching even before it's started. */
+  _markUpNext(next) {
+    const s = this.session;
+    const key = `${next.kind}:${next.id}`;
+    const doc = peekDoc(s.profileId, 'progress') || s.progress;
+    if (doc[key] && (doc[key].pos > 0 || doc[key].watched)) return;
+    const updated = { ...doc, [key]: { key, pos: 0, dur: 0, watched: false, upNext: true, updatedAt: Date.now() + 1, item: next } };
+    s.progress = updated;
+    setDoc(s.profileId, 'progress', updated).catch(() => {});
   }
 
   async command(cmd) {

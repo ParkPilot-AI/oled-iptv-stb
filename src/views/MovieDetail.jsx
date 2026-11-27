@@ -7,7 +7,7 @@ import { Icon } from '../components/Icons.jsx';
 import { useBack } from '../nav/keys.js';
 import { pushScope, focusFirst } from '../nav/spatial.js';
 import { duration, humanDuration } from '../lib/format.js';
-import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
+import { useArt, useArtSettings, chooseArt, artChoices } from '../lib/art.js';
 
 /** Full-screen overlay with its own focus scope; Back closes it. */
 export function DetailOverlay({ children, className = '' }) {
@@ -68,9 +68,9 @@ export function MovieDetail({ item }) {
 
   return (
     <DetailOverlay>
-      {m.backdrop && <LazyImg src={m.backdrop} width={1920} className="detail-backdrop" />}
+      {(m0.backdrop || art?.backdrop) && <LazyImg src={artChoices(mode, m0.backdrop, art?.backdrop)} width={1920} className="detail-backdrop" />}
       <div className="detail-body" ref={ref}>
-        <LazyImg src={m.icon} width={480} className="detail-poster" fallback={<Icon name="movie" size="4rem" />} />
+        <LazyImg src={artChoices(mode, m0.icon, art?.poster)} width={480} className="detail-poster" fallback={<Icon name="movie" size="4rem" />} />
         <div className="detail-info">
           <h1>{m.name}</h1>
           <div className="meta">

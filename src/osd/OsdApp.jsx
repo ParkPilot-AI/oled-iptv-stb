@@ -6,6 +6,7 @@ import { keyAction } from '../nav/keys.js';
 import { clock, duration, progressPct, epLabel, bitrate } from '../lib/format.js';
 import { Icon } from '../components/Icons.jsx';
 import { Screensaver } from '../components/Screensaver.jsx';
+import { VolumeHud, changeVolume } from '../components/VolumeHud.jsx';
 import { usePixelShift } from '../components/Modal.jsx';
 import { useLiveNav, SurfBanner, GlassGuide } from './LiveNav.jsx';
 import './osd.css';
@@ -109,6 +110,11 @@ export default function OsdApp() {
       const s = stRef.current;
       if (!s) return;
       const action = keyAction(e);
+      if (action === 'volUp' || action === 'volDown' || action === 'mute') {
+        e.preventDefault?.();
+        changeVolume(action);
+        return;
+      }
       if (saver) {
         setSaver(false);
         return;
@@ -242,6 +248,7 @@ export default function OsdApp() {
           <p>{st.kind === 'live' ? 'Channel Up/Down to switch · Back to exit' : 'Back to exit'}</p>
         </div>
       )}
+      <VolumeHud />
       {digits && <div className="osd-digits">{digits}</div>}
       {note && <div className="osd-note">{note}</div>}
       {showInfo && <StreamInfo st={st} />}

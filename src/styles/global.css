@@ -1856,3 +1856,112 @@ small {
   flex-direction: column;
   gap: 0.5rem;
 }
+
+/* ONYX logo: PNG used as a mask so it follows the text colour. */
+.logo {
+  display: inline-block;
+  flex: none;
+  background: currentColor;
+  -webkit-mask: var(--logo) center / contain no-repeat;
+  mask: var(--logo) center / contain no-repeat;
+}
+.logo-word {
+  aspect-ratio: 1386 / 315;
+}
+.logo-mark {
+  aspect-ratio: 343 / 315;
+}
+.rail-brand {
+  position: relative;
+  color: var(--text);
+}
+.rail-brand .rail-mark {
+  transition: opacity 0.2s;
+}
+.rail.is-open .rail-brand .rail-mark {
+  opacity: 0;
+}
+.rail-brand .rail-label {
+  position: absolute;
+  left: 1.05rem;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* ---------- settings: tabs, sliders, switches ---------- */
+.settings .pill-tabs {
+  margin-bottom: 1.6rem;
+}
+.settings-hint {
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  padding: 0.4rem 1.4rem 0.8rem;
+}
+.slider-value {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+}
+.slider-track {
+  position: relative;
+  width: 12rem;
+  height: 0.35rem;
+  border-radius: 1rem;
+  background: #2a2a30;
+}
+.slider-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  border-radius: 1rem;
+}
+.slider-knob {
+  position: absolute;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  border-radius: 50%;
+  background: var(--text);
+}
+.slider-num {
+  min-width: 5.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.setting-row:focus .slider-track {
+  background: #3a3a42;
+}
+.switch {
+  position: relative;
+  width: 3.4rem;
+  height: 1.9rem;
+  border-radius: 1rem;
+  background: #2a2a30;
+  transition: background 0.2s;
+  flex: none;
+}
+.switch i {
+  position: absolute;
+  top: 0.25rem;
+  left: 0.25rem;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.2s var(--ease-spring), background 0.2s;
+}
+.switch.is-on {
+  background: var(--accent);
+}
+.switch.is-on i {
+  transform: translateX(1.5rem);
+  background: #fff;
+}

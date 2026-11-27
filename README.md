@@ -1,4 +1,4 @@
-# OLED IPTV — 10-foot Xtream Codes player
+# ONYX — 10-foot Xtream Codes player for OLED TVs
 
 A keyboard and D-pad driven IPTV player for a Windows or Linux mini PC connected to an OLED TV. The UI is built with Electron and React. Video plays through **mpv** with hardware decoding, so HEVC/H.265, 10-bit, AC3/EAC3 and `.ts` streams all play. Nothing in the app needs a mouse.
 
@@ -152,7 +152,14 @@ In text fields and on Search, typing on a physical keyboard goes straight in, an
 
 ---
 
-**Audio & subtitles (Settings).** *Audio output* cycles through the outputs this machine has: TV (HDMI), a second HDMI port, the headphone jack, USB or Bluetooth audio. On Linux it switches the PipeWire card profile and moves playing audio straight away; elsewhere it uses mpv's device list. *Subtitles* can be Off, On, or *Only for foreign dialogue* (forced tracks, the default), in your preferred language, with four sizes and a dark box or outline style. Changes apply to what's playing. **S** still cycles subtitle tracks by hand.
+**Settings** has six tabs (PgUp/PgDn to switch):
+
+* **Picture**: brightness, contrast, colour and gamma sliders (◀ ▶), aspect ratio (original, 16:9, 4:3, 21:9, zoom or stretch to fill), upscaling quality, debanding, HDR-to-SDR tone mapping, deinterlacing and hardware decoding.
+* **Sound**: output (TV over HDMI, a second HDMI port, the headphone jack, USB…), stereo downmix for TV speakers, Dolby/DTS passthrough for a soundbar or AV receiver, preferred audio language, night mode or even-volume levelling, and lip-sync delay.
+* **Subtitles**: an on/off switch (off by default), preferred language, size and a dark box or outline style. **S** still switches tracks during playback.
+* **General**, **Library** (playlists, refresh, TMDB key, artwork sources) and **System** (Wi-Fi, updates, version, **Power Off**).
+
+Changes apply to what's playing. **Volume Up / Down / Mute** keys change the box's volume anywhere in the app, with an on-screen level indicator.
 
 ## 5. Artwork
 

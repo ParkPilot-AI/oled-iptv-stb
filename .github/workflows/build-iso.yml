@@ -35,5 +35,5 @@ jobs:
         run: |
           tag="iso-$(date -u +%Y%m%d-%H%M)"
           gh release create "$tag" stb/out/*.iso stb/out/oled-iptv-app.tar.zst stb/out/app-version.txt stb/out/SHA256SUMS \
-            --title "OLED IPTV installer ISO ($tag)" \
+            --title "ONYX installer ISO ($tag)" \
             --latest --notes "Installed boxes: Settings → Update system. New install: write to a USB stick: sudo dd if=<file>.iso of=/dev/sdX bs=4M status=progress oflag=sync — then boot the OptiPlex from it (F12). See stb/README.md."

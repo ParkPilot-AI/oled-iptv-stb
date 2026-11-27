@@ -16,6 +16,9 @@ npx electron-builder --linux dir --publish never
 # Build id lets the in-app updater tell versions apart.
 BUILD_ID=${BUILD_ID:-$(date -u +%Y.%m.%d-%H%M)}
 echo "$BUILD_ID" > release/linux-unpacked/stb-version.txt
+# Box helpers travel with the app so "Update system" keeps them current too.
+mkdir -p release/linux-unpacked/stb-system
+cp /kit/overlay/airootfs/root/stb-files/{stb-update,stb-audio.sh,nm-stb.conf} release/linux-unpacked/stb-system/
 # Tarball keeps executable bits/setuid layout (archiso resets modes of airootfs files).
 mkdir -p /build/payload
 tar -C release/linux-unpacked -I 'zstd -19 -T0' -cf /build/payload/oled-iptv.tar.zst .
@@ -60,12 +63,12 @@ du -sh /build/profile/airootfs/opt/stb-repo
 sed -i \
   -e 's/^iso_name=.*/iso_name="oled-iptv-installer"/' \
   -e 's/^iso_label=.*/iso_label="OLEDIPTV_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"/' \
-  -e 's/^iso_publisher=.*/iso_publisher="OLED IPTV"/' \
-  -e 's/^iso_application=.*/iso_application="OLED IPTV set-top box installer"/' \
+  -e 's/^iso_publisher=.*/iso_publisher="ONYX"/' \
+  -e 's/^iso_application=.*/iso_application="ONYX set-top box installer"/' \
   /build/profile/profiledef.sh
 cat >> /build/profile/airootfs/root/.zlogin <<'EOF'
 
-# OLED IPTV: run the set-top-box installer once, on the first console.
+# ONYX: run the set-top-box installer once, on the first console.
 if [[ "$(tty)" == /dev/tty1 && ! -e /tmp/.stb-started ]]; then
   touch /tmp/.stb-started
   bash /root/stb-install.sh

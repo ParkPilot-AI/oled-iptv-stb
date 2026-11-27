@@ -59,6 +59,12 @@ export function useArt(item, enabled = true) {
   return mode === 'off' ? null : art;
 }
 
+/** Ordered image candidates (provider vs TMDB); the next is used if one fails to load. */
+export function artChoices(mode, provider, tmdb) {
+  if (mode === 'off') return [provider];
+  return mode === 'prefer' ? [tmdb, provider] : [provider, tmdb];
+}
+
 /** Pick provider vs TMDB image according to the setting. */
 export function chooseArt(mode, provider, tmdb) {
   if (mode === 'prefer') return tmdb || provider || '';
