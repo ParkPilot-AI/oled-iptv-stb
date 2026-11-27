@@ -49,16 +49,54 @@ export function streamUrl(creds, item, opts = {}) {
   }
 }
 
+/** Turn Node's opaque "fetch failed" into something a person can act on. */
+export function networkError(err, url) {
+  let host = '';
+  let port = '';
+  try {
+    const u = new URL(url);
+    host = u.hostname;
+    port = u.port || (u.protocol === 'https:' ? '443' : '80');
+  } catch {}
+  const c = err?.cause || {};
+  const code = c.code || err?.code || '';
+  const why = {
+    ENOTFOUND: `Can't find the server "${host}". Check the server address, or the box may be offline (check Wi-Fi).`,
+    EAI_AGAIN: `Can't look up "${host}": the box seems to be offline. Check Wi-Fi.`,
+    ECONNREFUSED: `${host} refused the connection on port ${port}. Check the port in the server URL (for example :8080).`,
+    ECONNRESET: `${host} closed the connection. Check the port, or try http:// instead of https://.`,
+    ETIMEDOUT: `${host} didn't answer on port ${port}. Check the port in the server URL, or your internet connection.`,
+    UND_ERR_CONNECT_TIMEOUT: `${host} didn't answer on port ${port}. Check the port in the server URL, or your internet connection.`,
+    ENETUNREACH: 'No network. Connect to Wi-Fi first.',
+    EHOSTUNREACH: `Can't reach ${host}. Check your internet connection.`,
+    UND_ERR_SOCKET: `${host} dropped the connection. Check the port, or try http:// instead of https://.`,
+  }[code];
+  if (why) return new Error(why);
+  if (/certificate|SSL|TLS/i.test(`${code} ${c.message || ''}`)) return new Error(`Secure connection to ${host} failed. Try http:// instead of https://.`);
+  if (err?.name === 'AbortError' || /timed out/i.test(err?.message || '')) return new Error(`${host} took too long to answer. Check the server URL and your connection.`);
+  const detail = c.message || code;
+  return new Error(`Couldn't connect to ${host || 'the server'}${detail ? ` (${detail})` : ''}.`);
+}
+
 export async function fetchWithTimeout(url, { timeoutMs = 30000, ...init } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs);
   try {
-    const res = await fetch(url, {
-      ...init,
-      signal: ctrl.signal,
-      headers: { 'User-Agent': USER_AGENT, Accept: '*/*', ...(init.headers || {}) },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    let res;
+    try {
+      res = await fetch(url, {
+        ...init,
+        signal: ctrl.signal,
+        headers: { 'User-Agent': USER_AGENT, Accept: '*/*', ...(init.headers || {}) },
+      });
+    } catch (e) {
+      throw networkError(e, url);
+    }
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) throw new Error(`Server refused access (HTTP ${res.status}). Check the username and password.`);
+      if (res.status === 404) throw new Error('Server answered, but this isn\'t an Xtream Codes address (HTTP 404). Check the server URL and port.');
+      throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    }
     return res;
   } finally {
     clearTimeout(t);

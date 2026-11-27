@@ -6,6 +6,8 @@ import { TextField } from '../components/VirtualKeyboard.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { focusFirst } from '../nav/spatial.js';
 import { useBack } from '../nav/keys.js';
+import { NetworkRow } from '../components/NetworkSettings.jsx';
+import { UpdateRow } from '../components/SystemUpdate.jsx';
 
 /** Profile picker + add/edit playlist form. */
 export function Login() {
@@ -138,6 +140,22 @@ function ProfileForm({ initial, onSaved, onCancel, canCancel }) {
           </Focusable>
         )}
       </div>
+      <SystemRows />
+    </div>
+  );
+}
+
+/** On the set-top box: Wi-Fi and updates are reachable before any playlist exists. */
+function SystemRows() {
+  const [updater, setUpdater] = useState(false);
+  useEffect(() => {
+    api.invoke('app:info').then((i) => setUpdater(!!i?.updater)).catch(() => {});
+  }, []);
+  if (!updater) return null;
+  return (
+    <div className="login-system">
+      <NetworkRow />
+      <UpdateRow />
     </div>
   );
 }

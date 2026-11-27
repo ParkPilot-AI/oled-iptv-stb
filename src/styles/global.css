@@ -1849,3 +1849,10 @@ small {
 .update-step .btn-small {
   margin-left: auto;
 }
+
+.login-system {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
