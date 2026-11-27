@@ -50,6 +50,14 @@ say "Network"
 echo -1 > /sys/module/usbcore/parameters/autosuspend 2>/dev/null || true
 for f in /sys/bus/usb/devices/*/power/control; do echo on > "$f" 2>/dev/null || true; done
 systemctl stop iwd systemd-networkd 2>/dev/null || true
+has_wifi() { for d in /sys/class/net/*; do [[ -d $d/wireless ]] && return 0; done; return 1; }
+# If iwd ran earlier it may have removed the interface: reload the USB Wi-Fi drivers.
+if ! has_wifi; then
+  for m in rtl8xxxu r8188eu rtw88_8821cu rtw88_8822bu mt7601u mt76x2u ath9k_htc; do
+    if lsmod | grep -q "^$m "; then modprobe -r "$m" 2>/dev/null; modprobe "$m" 2>/dev/null; fi
+  done
+  for _ in $(seq 1 10); do has_wifi && break; sleep 1; done
+fi
 install -Dm644 "$FILES/nm-stb.conf" /etc/NetworkManager/conf.d/stb.conf
 systemctl restart NetworkManager 2>/dev/null || true
 for _ in $(seq 1 20); do nmcli -t general status >/dev/null 2>&1 && break; sleep 1; done

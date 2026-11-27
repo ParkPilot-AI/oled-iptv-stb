@@ -26,6 +26,10 @@ echo "$BUILD_ID" > /out/app-version.txt
 echo "==> Preparing archiso profile"
 cp -r /usr/share/archiso/configs/releng /build/profile
 rsync -a /kit/overlay/ /build/profile/
+# iwd deletes and re-creates the Wi-Fi interface, which breaks rtl8xxxu dongles
+# (wlan0 vanishes). The installer uses NetworkManager instead, so never start iwd.
+rm -f /build/profile/airootfs/etc/systemd/system/multi-user.target.wants/iwd.service
+ln -sf /dev/null /build/profile/airootfs/etc/systemd/system/iwd.service
 echo "${STB_REPO:-}" > /build/profile/airootfs/root/stb-files/update-repo
 mkdir -p /build/profile/airootfs/opt/stb-payload
 cp /build/payload/oled-iptv.tar.zst /build/profile/airootfs/opt/stb-payload/
