@@ -27,6 +27,9 @@ docker run --rm --privileged \
   -v "$KIT":/kit:ro -v "$APP":/app:ro -v "$OUT":/out \
   archlinux:latest bash /kit/container-build.sh
 
+# Hand the output folder back to the invoking user (it was created as root).
+chown -R "${SUDO_UID:-$(id -u)}:${SUDO_GID:-$(id -g)}" "$OUT"
+
 echo
 echo "==> Done:"
 ls -lh "$OUT"/*.iso
