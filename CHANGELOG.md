@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.3
+
+### Fixed
+- **GeForce NOW *Log in* still did nothing.** The desktop portal that passes GeForce NOW's
+  sign-in link on couldn't reach the TV display ("cannot open display"). The X session now
+  shares its display with those background services, and updating fixes a running box too.
+
 ## 1.2.2
 
 ### Fixed

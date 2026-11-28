@@ -63,6 +63,20 @@ cmd_check() {
 # Keep the box's own helpers and config in step with the app (shipped in the app
 # package as stb-system/).
 KIOSK_USER=${STB_KIOSK_USER:-tv}
+# The running X session's display for the kiosk user's systemd services (the desktop
+# portal needs it; openbox-autostart does the same at every login).
+portal_display() {
+  [[ -n ${STB_ROOT:-} ]] && return 0 # tests: no real user session
+  local uid; uid=$(id -u "$KIOSK_USER" 2>/dev/null) || return 0
+  [[ -S /run/user/$uid/bus && -S /tmp/.X11-unix/X0 ]] || return 0
+  local home; home=$(getent passwd "$KIOSK_USER" | cut -d: -f6)
+  local u=(runuser -u "$KIOSK_USER" -- env XDG_RUNTIME_DIR="/run/user/$uid" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus")
+  "${u[@]}" systemctl --user set-environment DISPLAY=:0 "XAUTHORITY=$home/.Xauthority" >/dev/null 2>&1 || return 0
+  "${u[@]}" systemctl --user reset-failed xdg-desktop-portal.service xdg-desktop-portal-gtk.service >/dev/null 2>&1
+  "${u[@]}" systemctl --user try-restart xdg-desktop-portal.service >/dev/null 2>&1
+  return 0
+}
+
 install_system_files() {
   local src=$1
   [[ -d $src ]] || return 0
@@ -85,8 +99,8 @@ install_system_files() {
   fi
   local home; home=$(getent passwd "$KIOSK_USER" | cut -d: -f6); home=${home:-/home/$KIOSK_USER}
   # Files in the kiosk user's home must stay theirs (install -D makes root-owned dirs).
-  user_put() {
-    put "$1" "$2" 644 || return 1
+  user_put() { # <src> <dest> [mode]
+    put "$1" "$2" "${3:-644}" || return 1
     local d=$p$2
     while [[ $d != "$p$home" && $d != / && $d != . ]]; do
       chown "$KIOSK_USER:" "$d" 2>/dev/null || true
@@ -96,6 +110,8 @@ install_system_files() {
   }
   user_put "$src/onyx-browser.desktop" "$home/.local/share/applications/onyx-browser.desktop" || true
   user_put "$src/mimeapps.list" "$home/.config/mimeapps.list" || true
+  user_put "$src/openbox-autostart" "$home/.config/openbox/autostart" 755 || true
+  portal_display
   if put "$src/openbox-rc.xml" "$home/.config/openbox/rc.xml" 644; then
     chown -R "$KIOSK_USER:$KIOSK_USER" "$p$home/.config/openbox" 2>/dev/null || true
     runuser -u "$KIOSK_USER" -- env DISPLAY=:0 openbox --reconfigure >/dev/null 2>&1 || true
