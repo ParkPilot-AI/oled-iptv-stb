@@ -27,7 +27,6 @@ export function useUpdateStatus() {
   };
   useEffect(() => {
     check(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return { st, checking, check };
 }

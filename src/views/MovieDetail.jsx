@@ -56,9 +56,10 @@ export function MovieDetail({ item }) {
   const m0 = { ...item, ...(info || {}), kind: 'movie', icon: info?.icon || item.icon };
   const m = { ...m0, icon: chooseArt(mode, m0.icon, art?.poster), backdrop: chooseArt(mode, m0.backdrop, art?.backdrop), plot: m0.plot || art?.overview || '' };
 
+  const loaded = !!info;
   useEffect(() => {
     requestAnimationFrame(() => focusFirst(ref.current));
-  }, [!!info]);
+  }, [loaded]);
 
   const start = async (fromStart) => {
     const playItem = { kind: 'movie', id: m.id, name: m.name, ext: m.ext, icon: m.icon, duration: m.duration };

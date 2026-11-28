@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useRef } from 'react';
-import { useStore, setState, boot, toggleFavorite, favRegistry, confirmDialog, activateProfile, getState, powerOff } from './lib/store.js';
-import { api } from './lib/api.js';
+import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff } from './lib/store.js';
 import { dispatchKey, useBack, useKeyHandler, keyAction } from './nav/keys.js';
 import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';

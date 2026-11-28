@@ -208,7 +208,7 @@ export function createMockApi() {
     'epg:short': () => [],
     'vod:info': async ({ item }) => {
       await wait(150);
-      return { ...item, backdrop: item.icon ? backdropArt(item.id) : '', plot: 'A gripping demo synopsis that runs for a couple of lines to check wrapping and readability from ten feet away on a large OLED panel.', cast: 'Ada Lovelace, Alan Turing, Grace Hopper', director: 'Demo Director', genre: 'Drama, Thriller', year: '2024', duration: 6420, backdrop: '' };
+      return { ...item, plot: 'A gripping demo synopsis that runs for a couple of lines to check wrapping and readability from ten feet away on a large OLED panel.', cast: 'Ada Lovelace, Alan Turing, Grace Hopper', director: 'Demo Director', genre: 'Drama, Thriller', year: '2024', duration: 6420, backdrop: '' };
     },
     'series:info': async ({ item }) => {
       await wait(150);

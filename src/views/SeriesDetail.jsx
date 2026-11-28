@@ -48,9 +48,10 @@ export function SeriesDetail({ item }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info]);
 
+  const loaded = !!info;
   useEffect(() => {
     requestAnimationFrame(() => focusFirst(ref.current));
-  }, [!!info]);
+  }, [loaded]);
 
   const season = info?.seasons[seasonIdx];
   const playEpisode = (ep) => play(playlist, Math.max(0, playlist.findIndex((x) => x.id === ep.id)));

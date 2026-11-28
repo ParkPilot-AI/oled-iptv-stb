@@ -142,6 +142,7 @@ function runUpdate() {
     buf += d;
     let i;
     while ((i = buf.indexOf('\n')) !== -1) {
+      // eslint-disable-next-line no-control-regex -- strip ANSI colour codes
       const line = buf.slice(0, i).replace(/\x1b\[[0-9;]*m/g, '');
       buf = buf.slice(i + 1);
       if (!line.trim()) continue;

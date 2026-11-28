@@ -89,7 +89,7 @@ export async function pruneImageCache() {
   const root = cacheDir();
   const files = [];
   let total = 0;
-  let dirs = [];
+  let dirs;
   try {
     dirs = await fsp.readdir(root);
   } catch {
