@@ -1,7 +1,7 @@
 {
   "name": "oled-iptv-player",
   "productName": "ONYX",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "10-foot, keyboard/D-pad driven Xtream Codes IPTV player for OLED TVs, powered by mpv.",
   "main": "electron/main.js",
   "type": "module",

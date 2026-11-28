@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.2.0
+
+### New
+- **Games (GeForce NOW).** Settings → General → *Show Games in sidebar* (off by default) adds
+  **Games** between TV Shows and Favourites. **Play GeForce NOW** opens NVIDIA's official app
+  full screen; playback stops and the screensaver pauses while it runs, and ONYX comes back,
+  focused on Games, when you quit. On the box, **Install GeForce NOW** downloads NVIDIA's
+  Flatpak with live progress and *Update system* keeps it current. On Windows it launches the
+  installed app or opens NVIDIA's download page. Emergency exit: **Ctrl+Alt+Home** (or Home on
+  the remote).
+- **Bluetooth controllers.** Settings → Controllers pairs, connects, disconnects and forgets
+  controllers with the remote, gamepads listed first. A toast says when a controller connects
+  or disconnects, with its battery level. Without a Bluetooth adapter the options are greyed
+  out; they switch on within seconds of plugging one in.
+
+### Box
+- New packages: bluez, bluez-utils, flatpak, xdg-desktop-portal-gtk; `bluetooth.service`
+  enabled; BlueZ configured for controllers (`/etc/bluetooth/main.conf`).
+- `stb-update` gains `provision`, `bt …` and `games …`. Boxes updated from 1.1.0 show
+  **Finish installing the update** once (and in Settings → System) to add the new packages.
+
 ## 1.1.0
 
 ### New
