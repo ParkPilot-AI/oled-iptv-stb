@@ -470,6 +470,9 @@ export function createMockApi() {
       saveViewersDb();
       return viewersPublic();
     },
+    'sync:status': () => ({ tasks: [] }),
+    'system:sleep': () => ({ screenOff: false }),
+    'system:wake': () => true,
     // Phone sign-in (dev console: mockPhoneLogin({ server, username, password })).
     'phonelogin:start': () => {
       window.mockPhoneLogin = (f) => emit('phonelogin:submit', { name: '', ...f });

@@ -9,6 +9,12 @@ import { classifyChannel, homeCountryOf } from './artmatch.js';
 import { apiUrl, fetchJson, normVodInfo, normSeriesInfo, normShortEpg } from './xtream.js';
 import { nowNext, range } from './xmltv.js';
 
+// Background work is reported for the "Updating…" pill (see sync.js).
+let track = (label, p) => p;
+export function setSyncTracker(t) {
+  track = t.track;
+}
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 // Workers cannot be loaded from inside app.asar; electron-builder unpacks them.
 const workerPath = path.join(here, 'workers', 'catalog-worker.js').replace('app.asar', 'app.asar.unpacked');
@@ -85,7 +91,7 @@ export async function refreshLogos(pid, notify, { force = false } = {}) {
   const lg = memLogos.get(pid) || (await readJson(logosFile(pid), null));
   if (!force && lg?.v === 2 && Date.now() - lg.fetchedAt < LOGO_TTL && lg.total === cat.live.items.length) return lg;
   if (logoJobs.has(pid)) return logoJobs.get(pid);
-  const job = runJob('logos', { items: cat.live.items.map(({ id, name, epg }) => ({ id, name, epg })) })
+  const job = track('Matching channel logos', runJob('logos', { items: cat.live.items.map(({ id, name, epg }) => ({ id, name, epg })) }))
     .then(async (res) => {
       memLogos.set(pid, res);
       await writeJson(logosFile(pid), res);
@@ -133,7 +139,7 @@ async function loadCatalogRaw(pid, { force = false } = {}, notify) {
   if (cat) {
     memCatalog.set(pid, cat);
     if (Date.now() - cat.fetchedAt > ttl) {
-      fetchCatalog(pid, notify)
+      track('Updating playlist', fetchCatalog(pid, notify))
         .then(async (fresh) => notify?.('catalog:updated', { profileId: pid, catalog: await withLogos(pid, fresh) }))
         .catch((e) => console.warn('[catalog] background refresh failed:', e.message));
     }
@@ -157,16 +163,19 @@ export async function loadEpg(pid, { force = false } = {}, notify) {
     if (epg) memEpg.set(pid, epg); // serve stale while refreshing
   }
   if (!epgInflight.has(pid)) {
-    const p = (async () => {
-      const creds = await getCredentials(pid);
-      const cat = memCatalog.get(pid) || (await loadCatalogRaw(pid, {}, notify));
-      const wanted = [...new Set(cat.live.items.map((s) => s.epg).filter(Boolean))];
-      const epg = await runJob('epg', { creds, options: { wanted } }, (pr) => notify?.('epg:progress', pr));
-      memEpg.set(pid, { index: epg.index, fetchedAt: epg.fetchedAt });
-      await writeJson(epgFile(pid), { index: epg.index, fetchedAt: epg.fetchedAt });
-      notify?.('epg:updated', { profileId: pid });
-      return { channels: Object.keys(epg.index).length, fetchedAt: epg.fetchedAt, parsed: epg.parsed };
-    })().finally(() => epgInflight.delete(pid));
+    const p = track(
+      'Loading TV guide',
+      (async () => {
+        const creds = await getCredentials(pid);
+        const cat = memCatalog.get(pid) || (await loadCatalogRaw(pid, {}, notify));
+        const wanted = [...new Set(cat.live.items.map((s) => s.epg).filter(Boolean))];
+        const epg = await runJob('epg', { creds, options: { wanted } }, (pr) => notify?.('epg:progress', pr));
+        memEpg.set(pid, { index: epg.index, fetchedAt: epg.fetchedAt });
+        await writeJson(epgFile(pid), { index: epg.index, fetchedAt: epg.fetchedAt });
+        notify?.('epg:updated', { profileId: pid });
+        return { channels: Object.keys(epg.index).length, fetchedAt: epg.fetchedAt, parsed: epg.parsed };
+      })()
+    ).finally(() => epgInflight.delete(pid));
     epgInflight.set(pid, p);
   }
   return epgInflight.get(pid);
@@ -196,9 +205,7 @@ export function epgGrid(pid, epgIds, from, to) {
   const out = {};
   for (const id of epgIds) {
     const list = idx?.[String(id).toLowerCase()];
-    out[id] = list
-      ? list.filter((p) => p[1] > from && p[0] < to).map((p) => ({ start: p[0], stop: p[1], title: p[2], desc: p[3] }))
-      : [];
+    out[id] = list ? list.filter((p) => p[1] > from && p[0] < to).map((p) => ({ start: p[0], stop: p[1], title: p[2], desc: p[3] })) : [];
   }
   return out;
 }

@@ -27,6 +27,7 @@ import { watchSignin, createSigninWindow, signinDir } from './signin.js';
 import { pipRect, mpvGeometry } from './pip.js';
 import { createPhoneLogin } from './phonelogin.js';
 import * as viewers from './viewers.js';
+import { createSyncTracker } from './sync.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -308,6 +309,19 @@ const player = new Player({
   },
 });
 
+// ---------- background sync status ("Updating TV guide…") ----------
+const sync = createSyncTracker((ch, data) => sendMain(ch, data));
+catalog.setSyncTracker(sync);
+
+// ---------- sleep: stop playback and switch the picture off ----------
+const run = (cmd, args) => new Promise((resolve) => execFile(cmd, args, { timeout: 5000 }, (err) => resolve(!err)));
+async function sleepDisplay(on) {
+  if (process.platform !== 'linux' || !process.env.DISPLAY) return false;
+  if (on) return run('xset', ['dpms', 'force', 'off']);
+  await run('xset', ['dpms', 'force', 'on']);
+  return run('xset', ['-dpms']); // back to "never blank" (the app has its own screensaver)
+}
+
 // ---------- playlist sign-in from a phone (QR code on the TV) ----------
 const phoneLogin = createPhoneLogin({ onSubmit: (fields) => sendMain('phonelogin:submit', fields) });
 
@@ -521,6 +535,13 @@ const handlers = {
   'art:get': (q) => getArtwork(q),
   'art:testKey': (key) => testTmdbKey(key),
   'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
+  'sync:status': () => ({ tasks: sync.list() }),
+  'system:sleep': async () => {
+    await player.stop({ reason: 'sleep' }); // also frees the provider connection
+    sendMain('power:sleeping', true);
+    return { screenOff: await sleepDisplay(true) };
+  },
+  'system:wake': () => sleepDisplay(false),
   'phonelogin:start': () => phoneLogin.start(),
   'phonelogin:stop': () => phoneLogin.stop(),
   'games:status': () => games.status(),

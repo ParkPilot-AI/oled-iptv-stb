@@ -275,6 +275,9 @@ export default function OsdApp() {
         case 'stop':
           cmd({ type: 'stop' });
           break;
+        case 'sleep':
+          api.invoke('system:sleep').catch(() => {});
+          break;
         case 'info':
           setShowInfo((v) => !v);
           break;

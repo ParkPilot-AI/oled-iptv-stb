@@ -25,6 +25,8 @@ let state = {
   detail: null, // {kind:'movie'|'series', item}
   toast: null,
   confirm: null,
+  sync: { tasks: [] }, // background updates (playlist, TV guide, logos)
+  sleeping: false,
 };
 const subs = new Set();
 export const getState = () => state;
@@ -320,6 +322,20 @@ export async function resumeEntry(entry) {
   }
 }
 
+// ---------- sleep ----------
+/** Stop playback (frees the provider connection) and switch the picture off. Any key wakes. */
+export async function sleep() {
+  setState({ sleeping: true, docked: null });
+  await api.invoke('system:sleep').catch(() => {});
+}
+export async function wake() {
+  if (!state.sleeping) return;
+  setState({ sleeping: false });
+  await api.invoke('system:wake').catch(() => {});
+}
+api.on('sync:status', (sync) => setState({ sync }));
+api.on('power:sleeping', () => setState({ sleeping: true, docked: null }));
+
 // ---------- power ----------
 /** "Power Off": shuts the set-top box down (closes the app on a normal PC). */
 export async function powerOff() {
@@ -329,8 +345,10 @@ export async function powerOff() {
     title: 'Power off?',
     message: box ? 'The box will shut down. Press its power button to turn it back on.' : 'ONYX will close.',
     confirmLabel: 'Power Off',
+    altLabel: 'Sleep',
     danger: true,
   });
+  if (ok === 'alt') return sleep();
   if (!ok) return;
   try {
     await api.invoke('system:poweroff');

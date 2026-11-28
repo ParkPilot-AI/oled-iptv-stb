@@ -12,6 +12,7 @@ import {
   applyScreenFit,
   reloadCatalog,
   powerOff,
+  sleep,
 } from '../lib/store.js';
 import { clearArtCache } from '../lib/art.js';
 import { THEMES } from '../lib/theme.js';
@@ -299,6 +300,17 @@ function useJob() {
   return { busy, run };
 }
 
+/** What's updating in the background (playlist, TV guide, channel logos). */
+function SyncRow() {
+  const tasks = useStore((s) => s.sync.tasks);
+  return (
+    <div className="setting-row is-static">
+      <span>Background updates</span>
+      <span className="setting-value muted">{tasks.length ? `${tasks.join(' · ')}…` : 'Up to date'}</span>
+    </div>
+  );
+}
+
 function Action({ label, value, onSelect, danger }) {
   return (
     <Focusable className={`setting-row ${danger ? 'is-danger' : ''}`} onSelect={onSelect}>
@@ -504,6 +516,7 @@ export function Settings() {
           />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
+          <SyncRow />
           <h2>Artwork</h2>
           <TextField label="TMDB API key" value={settings.tmdbKey || ''} mask onChange={saveTmdbKey} placeholder="Free at themoviedb.org → Settings → API" />
           {C('Movie & series artwork', 'artSource')}
@@ -540,6 +553,7 @@ export function Settings() {
             </>
           )}
           <h2>Power</h2>
+          <Action label="Sleep" value="Stops playback, screen off · any key wakes" onSelect={() => sleep()} />
           <Action label="Power Off" danger onSelect={() => powerOff()} />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">

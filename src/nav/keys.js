@@ -41,6 +41,11 @@ export function keyAction(e) {
       return 'prev';
     case 'MediaStop':
       return 'stop';
+    case 'Standby':
+    case 'Power':
+    case 'PowerOff':
+    case 'Sleep':
+      return 'sleep';
     case 'AudioVolumeUp':
     case 'VolumeUp':
       return 'volUp';

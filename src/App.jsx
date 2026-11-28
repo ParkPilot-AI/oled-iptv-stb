@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff, toast } from './lib/store.js';
+import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff, toast, sleep, wake } from './lib/store.js';
 import { dispatchKey, dispatchKeyUp, setLongPressHandler, useBack, useKeyHandler, keyAction } from './nav/keys.js';
 import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
 import { JobModal, useProvision } from './components/SystemUpdate.jsx';
@@ -85,7 +85,18 @@ function MainApp() {
   useEffect(() => {
     const onKey = (e) => {
       noteInput(e);
+      // Asleep: the first key (or controller button) only wakes the screen.
+      if (getState().sleeping) {
+        e.preventDefault();
+        wake();
+        return;
+      }
       const act = keyAction(e);
+      if (act === 'sleep') {
+        e.preventDefault();
+        sleep();
+        return;
+      }
       if (act === 'volUp' || act === 'volDown' || act === 'mute') {
         e.preventDefault();
         changeVolume(act);
@@ -178,9 +189,11 @@ function MainApp() {
       <ConfirmHost />
       <ToastHost />
       {bootState === 'ready' && <DockCaption />}
+      {bootState === 'ready' && <SyncPill />}
       {bootState === 'ready' && <HintBar />}
       <VolumeHud />
       {idle && <Screensaver />}
+      <SleepScreen />
     </div>
   );
 }
@@ -239,6 +252,30 @@ function CatalogLoading() {
           Change playlist
         </Focusable>
       </div>
+    </div>
+  );
+}
+
+/** Pure black while asleep (the screen is also switched off on the box). */
+function SleepScreen() {
+  const on = useStore((s) => s.sleeping);
+  return on ? <div className="sleep-screen" /> : null;
+}
+
+const STARTED_AT = Date.now();
+/** "Updating TV guide…" while background updates run — only around start-up (OLED). */
+function SyncPill() {
+  const tasks = useStore((s) => s.sync.tasks);
+  const [early, setEarly] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setEarly(false), Math.max(0, 90000 - (Date.now() - STARTED_AT)));
+    return () => clearTimeout(t);
+  }, []);
+  if (!early || !tasks.length) return null;
+  return (
+    <div className="sync-pill">
+      <span className="spinner-sm" />
+      {tasks[0]}…
     </div>
   );
 }

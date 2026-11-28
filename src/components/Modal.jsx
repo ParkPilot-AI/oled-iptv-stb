@@ -40,6 +40,11 @@ export function ConfirmHost() {
         <Focusable className="btn" onSelect={() => done(false)} autoFocus>
           {c.cancelLabel || 'Cancel'}
         </Focusable>
+        {c.altLabel && (
+          <Focusable className="btn" onSelect={() => done('alt')}>
+            {c.altLabel}
+          </Focusable>
+        )}
         <Focusable className={`btn ${c.danger ? 'btn-danger' : 'btn-primary'}`} onSelect={() => done(true)}>
           {c.confirmLabel || 'OK'}
         </Focusable>
