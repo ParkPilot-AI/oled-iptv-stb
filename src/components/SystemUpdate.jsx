@@ -85,6 +85,13 @@ const JOBS = {
   },
 };
 
+/** Exit code 2 from a non-update job = the box's updater predates that command. */
+export function exitMessage(code, job) {
+  if (code === 2 && job !== 'update')
+    return 'The box’s updater is too old for this. On Ctrl+Alt+F2 (user tv) run: sudo install -m755 /opt/oled-iptv/stb-system/stb-update /usr/local/sbin/stb-update — then try again.';
+  return `Updater exited with code ${code}`;
+}
+
 /** Progress dialog for a helper job other than the system update ('provision', 'games'). */
 export function JobModal({ job, onClose, onFinished }) {
   return <UpdateModal job={job} onClose={onClose} onFinished={onFinished} />;
@@ -109,7 +116,7 @@ function UpdateModal({ st, onClose, onFinished, job = 'update' }) {
       else if (ev.type === 'reboot') setResult((r) => ({ ...r, reboot: true }));
       else if (ev.type === 'error') setResult((r) => ({ ...r, error: ev.text }));
       else if (ev.type === 'exit') {
-        if (ev.code !== 0) setResult((r) => ({ ...r, error: r.error || `Updater exited with code ${ev.code}` }));
+        if (ev.code !== 0) setResult((r) => ({ ...r, error: r.error || exitMessage(ev.code, job) }));
         setPhase('done');
         onFinished?.();
       }
@@ -172,10 +179,18 @@ function UpdateModal({ st, onClose, onFinished, job = 'update' }) {
               </li>
               <li>
                 <b>ONYX app:</b>{' '}
-                {appNew ? `${st.appInstalled} → ${st.appLatest}` : st?.appLatest ? `${st.appInstalled} (latest)` : st?.repo ? 'version check unavailable (token?)' : 'no update source set'}
+                {appNew
+                  ? `${st.appInstalled} → ${st.appLatest}`
+                  : st?.appLatest
+                    ? `${st.appInstalled} (latest)`
+                    : st?.repo
+                      ? 'version check unavailable (token?)'
+                      : 'no update source set'}
               </li>
             </ul>
-            <p className="muted">Takes a few minutes. Keep the box powered on. The app restarts when it’s done; a reboot is offered if the system kernel changed.</p>
+            <p className="muted">
+              Takes a few minutes. Keep the box powered on. The app restarts when it’s done; a reboot is offered if the system kernel changed.
+            </p>
             <div className="row-buttons">
               <Focusable className="btn btn-primary" autoFocus onSelect={start}>
                 Update now

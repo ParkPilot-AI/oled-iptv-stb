@@ -1,11 +1,12 @@
 // Settings → Controllers: pair, connect and forget Bluetooth game controllers with
-// the remote. Modelled on NetworkSettings.jsx (stb-update bt … through main).
+// the remote, and list every controller (USB too) the app can read. Modelled on NetworkSettings.jsx (stb-update bt … through main).
 // Without a Bluetooth adapter every row is greyed out and skipped by focus; the
 // page keeps polling, so plugging in a USB dongle turns it on within ~5 s.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { toast, confirmDialog } from '../lib/store.js';
 import { useControllers, refreshControllers, bluetoothState } from '../lib/controllers.js';
+import { useGamepads } from '../lib/gamepad.js';
 import { Focusable } from './Focusable.jsx';
 import { Modal } from './Modal.jsx';
 import { focusFirst } from '../nav/spatial.js';
@@ -25,6 +26,7 @@ export function ControllerSettings() {
   const [device, setDevice] = useState(null);
   const paired = (st?.devices || []).filter((d) => d.paired);
   const off = !bt.enabled;
+  const pads = useGamepads(); // USB and Bluetooth pads the app can read
 
   return (
     <>
@@ -46,6 +48,17 @@ export function ControllerSettings() {
             <span className="setting-value muted">Xbox, PlayStation, 8BitDo… ›</span>
           </Focusable>
         )}
+        <h2>Connected now</h2>
+        {pads.length === 0 && <p className="settings-reason">Plug a controller in by USB or switch on a paired one, then press any button on it.</p>}
+        {pads.map((p) => (
+          <div key={p.index} className="setting-row is-static">
+            <span>{p.name}</span>
+            <span className="setting-value muted">Ready</span>
+          </div>
+        ))}
+        <p className="settings-reason">
+          A = OK · B = Back · D-pad or left stick = move · LB / RB = previous / next tab · X = play/pause · Y = favourite · Menu = info
+        </p>
       </div>
       {!bt.windows && (
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
@@ -74,7 +87,12 @@ function DeviceModal({ device, onClose }) {
   const act = async (what) => {
     if (busy) return;
     if (what === 'forget') {
-      const ok = await confirmDialog({ title: `Forget “${device.name}”?`, message: 'You’ll need to pair it again to use it.', confirmLabel: 'Forget', danger: true });
+      const ok = await confirmDialog({
+        title: `Forget “${device.name}”?`,
+        message: 'You’ll need to pair it again to use it.',
+        confirmLabel: 'Forget',
+        danger: true,
+      });
       if (!ok) return;
     }
     setBusy(what);

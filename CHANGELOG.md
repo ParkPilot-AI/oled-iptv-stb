@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.1
+
+### New
+- **Use a game controller in ONYX.** Any controller the box can see — USB or Bluetooth —
+  moves around the menus and controls playback: D-pad or left stick to move, **A** = OK
+  (hold for Favourites), **B** = Back, **LB / RB** = previous / next tab or channel,
+  **X** = play/pause, **Y** = favourite, **Menu** = info. Ignored while GeForce NOW is open.
+- **USB controllers are recognised.** Settings → Controllers lists every connected controller
+  under *Connected now*, the Games page shows it, and plugging one in shows a toast.
+
+### Fixed
+- "Finish installing the update" on a box whose updater is too old now says how to fix it
+  instead of "Updater exited with code 2".
+
 ## 1.2.0
 
 ### New

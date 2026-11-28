@@ -12,10 +12,10 @@ import { applyTheme } from '../lib/theme.js';
 import { usePixelShift } from '../components/Modal.jsx';
 import { useLiveNav, SurfBanner, GlassGuide } from './LiveNav.jsx';
 import { LiveBanner, VodBar } from './Bars.jsx';
+import { startGamepadNav } from '../lib/gamepad.js';
 import './osd.css';
 
 const cmd = (c) => api.invoke('player:command', c).catch(() => {});
-
 
 export default function OsdApp() {
   const [st, setSt] = useState(null);
@@ -229,6 +229,9 @@ export default function OsdApp() {
     },
     [saver, digits, visible, showInfo, poke, flash, toggleFav]
   );
+
+  // Controller buttons arrive as key events (A = OK, B = Back, D-pad = arrows).
+  useEffect(() => startGamepadNav(), []);
 
   useEffect(() => {
     const onKey = (e) => handle(e);

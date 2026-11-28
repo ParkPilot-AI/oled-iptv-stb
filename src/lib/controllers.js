@@ -12,6 +12,7 @@ let fast = 0;
 let timer = null;
 let inflight = null;
 let started = false;
+let lastBtConnect = 0; // when the Bluetooth watch last announced a controller
 const subs = new Set();
 const emit = () => subs.forEach((f) => f());
 
@@ -35,7 +36,10 @@ export async function refreshControllers() {
     .invoke('bt:status')
     .catch((e) => ({ adapter: false, reason: 'error', error: e.message, devices: [] }))
     .then((next) => {
-      for (const msg of diffGamepads(status, next)) toast(msg, 4000);
+      for (const msg of diffGamepads(status, next)) {
+        if (msg.startsWith('Controller connected')) lastBtConnect = Date.now();
+        toast(msg, 4000);
+      }
       status = next;
       emit();
       return next;
@@ -48,10 +52,13 @@ function schedule() {
   clearTimeout(timer);
   // Nothing to watch on Windows / non-box systems: no polling there.
   if (status && (status.reason === 'windows' || status.reason === 'unsupported')) return;
-  timer = setTimeout(async () => {
-    await refreshControllers();
-    schedule();
-  }, fast > 0 ? FAST_MS : SLOW_MS);
+  timer = setTimeout(
+    async () => {
+      await refreshControllers();
+      schedule();
+    },
+    fast > 0 ? FAST_MS : SLOW_MS
+  );
 }
 
 /** Start background watching (once, after start-up). */
@@ -84,15 +91,23 @@ export function bluetoothState(st) {
   if (st.reason === 'windows') return { enabled: false, windows: true, text: 'Managed by Windows', reason: 'Pair controllers in Windows Bluetooth settings.' };
   if (!st.adapter) {
     if (st.reason === 'unsupported') return { enabled: false, text: 'Not available', reason: 'Bluetooth pairing works on the ONYX set-top box.' };
-    return { enabled: false, text: 'No Bluetooth adapter found', reason: 'Plug in a USB Bluetooth adapter — this page turns on by itself within a few seconds.' };
+    return {
+      enabled: false,
+      text: 'No Bluetooth adapter found',
+      reason: 'Plug in a USB Bluetooth adapter — this page turns on by itself within a few seconds.',
+    };
   }
   if (st.blocked) return { enabled: false, text: 'Blocked', reason: 'Bluetooth is switched off by a hardware switch or BIOS setting.' };
   if (!st.powered) return { enabled: true, text: 'Off', reason: 'Bluetooth is off; it will be switched on when you pair.' };
   return { enabled: true, text: 'On', reason: '' };
 }
 
-/** "Xbox Wireless Controller connected · 80%" or null. */
-export function connectedPadText(st) {
+/** "Xbox Wireless Controller connected · 80%" or null. `pads` (Gamepad API, USB too) is the fallback. */
+export function connectedPadText(st, pads = []) {
   const d = gamepads(st)[0];
-  return d ? `${d.name} connected${d.battery != null ? ` · ${d.battery}%` : ''}` : null;
+  if (d) return `${d.name} connected${d.battery != null ? ` · ${d.battery}%` : ''}`;
+  return pads[0] ? `${pads[0].name} connected` : null;
 }
+
+/** True if a Bluetooth "Controller connected" toast was shown in the last `ms`. */
+export const btJustConnected = (ms = 8000) => Date.now() - lastBtConnect < ms;
