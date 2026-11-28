@@ -84,7 +84,11 @@ electron/
   catalog.js           worker orchestration, disk/memory caches, EPG queries, logos + channel types
   workers/catalog-worker.js
   mpv.js               mpv spawn + JSON IPC client + input.conf; resolveTool (mpv, yt-dlp)
-  player.js            playback session: playlist, zapping, auto-advance, progress, retries, trailers
+  player.js            playback session: playlist, zapping (freeze frame), auto-advance, Up next,
+                       progress, retries, trailers; window modes full / mini-player / preview
+  pip.js               mini-player and preview placement     channels.js  channel-number lookup
+  viewers.js           household profiles (Kids, PIN, per-profile documents)
+  phonelogin.js        one-time playlist form for a phone (QR code)    sync.js  background status
   mpvprops.js          picture/sound settings → mpv properties
   subs.js              subtitle choice + style       tracks.js   "Audio: English · AC3 5.1 (2/3)"
   audio.js             PipeWire outputs, system volume
@@ -103,12 +107,13 @@ src/
                        Hub (spotlight carousel + rows), PillTabs, NavRail, Modal/Confirm/Toast,
                        NetworkSettings (Wi-Fi), SystemUpdate (+ JobModal, ProvisionRow),
                        ControllerSettings (Bluetooth pairing), AdultSettings, TrailerButton,
-                       VolumeHud, Logo, Screensaver, Icons
+                       VolumeHud, Logo, Screensaver, Icons, HintBar, ProfileSettings
   views/               Login, Home, LiveTV, Library (Movies/TV Shows), MovieDetail,
-                       SeriesDetail, Favorites, Search, Games, Settings
+                       SeriesDetail, Favorites, Search, Games, Settings, WhoIsWatching
   osd/                 OsdApp (player overlay), Bars (live banner, VOD bar), LiveNav (surf + glass guide)
   lib/                 api bridge (mockApi only in demo builds), store (+ adult filter), art,
-                       discover, genres, theme, epg hooks, search, fav, controllers
+                       discover, genres, theme, epg hooks, search, fav, controllers, gamepad,
+                       feedback (input device, sounds, rumble), hints, qr, searchChips, upnext
 test/                  unit tests + mpv IPC test; stb/ updater, Wi-Fi, Bluetooth and Games tests;
                        e2e/ mock Xtream server
 stb/                   Arch set-top box: ISO build (build.sh, container-build.sh), installer,
@@ -166,12 +171,14 @@ node test/e2e/mock-xtream.mjs     # 300 channels + EPG + 1 movie + 1 series
 | Arrows | Move focus | Live: ▲/▼ channel surf (tunes after 1.8 s or on OK), ◀ glass channel guide over the video · VOD: ◀▶ ±10 s (30 s when held), ▲▼ ±60 s |
 | Enter (OK) | Select | Films/episodes: pause/play and show the bar · Live: show/hide the banner, confirm a typed channel number |
 | Hold OK (~0.6 s) | Add/remove the focused card in Favourites | — |
-| Esc / Backspace | Back one level (Back at the top level asks before exiting) | Close info/OSD, then stop |
+| Esc / Backspace | Back one level (Back at the top level closes the mini-player, then asks Power off / Sleep) | Close info/OSD, then: live TV and trailers shrink to the mini-player (Settings → General), films/episodes stop |
 | PageUp / PageDown (ChannelUp/Down) | Home & Movies/Series: cycle hub tabs · Live guide: page channels | Next / previous channel or episode (instant) |
 | Space / MediaPlayPause | — | Play/pause |
 | F | Add/remove the focused item in Favourites | Same for the playing channel or film; on an episode, its series |
-| I | — | Stream info (resolution, codecs, fps, bitrates, HW decoding) |
-| 0–9 | — | Jump to a channel number (Live) |
+| I (Info) | On a film/series poster: floating trailer preview (I or Back closes it) | Stream info (resolution, codecs, fps, bitrates, HW decoding) |
+| 0–9 | — | Type a channel number: "104 — BBC One HD", tunes after 1.2 s or on OK |
+| Space / MediaPlayPause in the menus | With the mini-player open: back to full screen | — |
+| Power / Standby | Sleep (stop playback, screen off; any key wakes) | Same |
 | A / S | — | Next audio track / subtitle track, named on screen ("Audio: English · AC3 5.1 (2/3)", "Subtitles: Off") |
 | Volume Up / Down / Mute | Box volume | Box volume |
 | Game controller (USB or Bluetooth) | D-pad / left stick move, A = OK (hold = Favourites), B = Back, LB / RB = previous / next tab | Same as the remote; X = play/pause, Y = info (trailer preview on a poster), Menu = favourite |
@@ -182,6 +189,20 @@ node test/e2e/mock-xtream.mjs     # 300 channels + EPG + 1 movie + 1 series
 **Adult channels** are hidden by default (Settings → General → Parental), optionally behind a 4-digit PIN.
 
 In text fields and on Search, typing on a physical keyboard goes straight in, and Backspace deletes a character (Esc still goes back).
+
+**Button hints** (bottom right) say what OK, Hold OK, Info and Back do on the focused item — "OK · Back" on a remote or keyboard, coloured "A · B · Y" on a controller — and fade out after 5 s. Navigation clicks and controller rumble (at the edge of a row and when a dialog opens) can be turned off in Settings → General → Menu.
+
+**Live TV:** changing channel keeps the last picture on screen (dimmed, with a small "Tuning to…" spinner) until the new channel's first frame, instead of a black screen. **Back** with the banner hidden shrinks the channel to a **mini-player** in the bottom-right corner while you browse; Play/Pause (X) returns it to full screen, Stop (or Back from the side menu) closes it.
+
+**Episodes:** in the last 30 s an **Up next** card shows the next episode with a 10-second countdown; OK plays it now, Back cancels.
+
+**Search** shows quick filters before you type — Trending tonight, Live sports, 4K movies, Recently added — and your recent searches.
+
+**Who's watching?** Settings → General → Profiles adds household profiles (up to 8). Each has its own favourites, Continue Watching, recent searches and theme; a **Kids** profile never shows adult content and can't change profiles; any profile can be locked with a 4-digit PIN. ONYX asks who's watching at start when there's more than one (can be turned off). The first profile keeps everything from before.
+
+**Add a playlist from your phone:** the playlist form shows a QR code. Scan it (same Wi-Fi), type the server, username and password on the phone, and they appear on the TV; press Save & connect. The link works once and only while the form is open.
+
+**Sleep:** Settings → System → Sleep, the Power-off dialog's Sleep button, or a Power/Standby key stops playback (freeing the provider's connection), closes the mini-player and switches the picture off on the box. Any key or controller button wakes it. Only one stream is ever open — full screen, mini-player or preview — so a single-connection account is never asked for two.
 
 ---
 

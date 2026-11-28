@@ -124,6 +124,7 @@ export class Player {
     if (this.session) {
       this._saveProgress();
       this.ui.onClosed({ reason: 'replaced', profileId: this.session.profileId, item: this.state?.item, index: this.session.index });
+      this.state = null;
     }
     const creds = items.every((it) => it.kind === 'trailer') ? null : await getCredentials(profileId);
     const settings = await getSettings();
