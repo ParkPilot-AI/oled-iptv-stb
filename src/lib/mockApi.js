@@ -2,11 +2,23 @@ import { classifyChannel } from '../../electron/artmatch.js';
 // Demo backend for browser-only development and automated UI tests.
 // Generates a large catalog (10k channels) to exercise virtualisation.
 
-const WORDS = 'Alpha Bravo Nova Prime Star Sky Ocean Metro City World Sport News Kids Cinema Gold Max Plus One Two Arena Planet Wild Royal Urban Retro Pulse Echo Vision Fusion'.split(' ');
-const rnd = (seed) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+const WORDS =
+  'Alpha Bravo Nova Prime Star Sky Ocean Metro City World Sport News Kids Cinema Gold Max Plus One Two Arena Planet Wild Royal Urban Retro Pulse Echo Vision Fusion'.split(
+    ' '
+  );
+const rnd = (seed) => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 
 // Generated abstract artwork (original, data: URLs) so the demo looks like a real library.
-const PALETTES = [['#1e3a8a', '#0ea5e9'], ['#7c2d12', '#f59e0b'], ['#064e3b', '#10b981'], ['#4c1d95', '#ec4899'], ['#111827', '#6366f1'], ['#3f1d0b', '#ef4444'], ['#0f172a', '#14b8a6'], ['#312e81', '#a78bfa']];
+const PALETTES = [
+  ['#1e3a8a', '#0ea5e9'],
+  ['#7c2d12', '#f59e0b'],
+  ['#064e3b', '#10b981'],
+  ['#4c1d95', '#ec4899'],
+  ['#111827', '#6366f1'],
+  ['#3f1d0b', '#ef4444'],
+  ['#0f172a', '#14b8a6'],
+  ['#312e81', '#a78bfa'],
+];
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 function art(seed, w, h, title) {
   const [a, b] = PALETTES[seed % PALETTES.length];
@@ -15,7 +27,9 @@ function art(seed, w, h, title) {
   const words = title ? esc(title.replace(/\s*\(\d{4}\)$/, '')).split(' ') : [];
   const text = title
     ? `<text x="${w * 0.08}" y="${h * 0.82}" font-family="Georgia,serif" font-weight="700" font-size="${w * 0.11}" fill="#fff" opacity=".92">${words.slice(0, 2).join(' ')}</text>` +
-      (words.length > 2 ? `<text x="${w * 0.08}" y="${h * 0.82 + w * 0.13}" font-family="Georgia,serif" font-weight="700" font-size="${w * 0.11}" fill="#fff" opacity=".92">${words.slice(2).join(' ')}</text>` : '')
+      (words.length > 2
+        ? `<text x="${w * 0.08}" y="${h * 0.82 + w * 0.13}" font-family="Georgia,serif" font-weight="700" font-size="${w * 0.11}" fill="#fff" opacity=".92">${words.slice(2).join(' ')}</text>`
+        : '')
     : '';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="#000"/></linearGradient><radialGradient id="r" cx="${cx}%" cy="${cy}%" r="55%"><stop offset="0" stop-color="${b}" stop-opacity=".9"/><stop offset="1" stop-color="${b}" stop-opacity="0"/></radialGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><rect width="100%" height="100%" fill="url(#r)"/><circle cx="${(cx / 100) * w}" cy="${(cy / 100) * h}" r="${Math.min(w, h) * 0.12}" fill="#fff" opacity=".12"/>${text}</svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -23,14 +37,23 @@ function art(seed, w, h, title) {
 const posterArt = (seed, title) => art(seed, 300, 450, title);
 // Stand-ins for TMDB title logos and iptv-org channel logos (demo only).
 function titleLogo(title) {
-  const t = esc(String(title).replace(/\s*\(\d{4}\)$/, '').toUpperCase());
+  const t = esc(
+    String(title)
+      .replace(/\s*\(\d{4}\)$/, '')
+      .toUpperCase()
+  );
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260"><text x="0" y="170" font-family="Georgia,serif" font-weight="700" font-size="120" letter-spacing="6" fill="#f5f5f5"${t.length > 11 ? ' textLength="890" lengthAdjust="spacingAndGlyphs"' : ''}>${t}</text><rect x="4" y="205" width="300" height="10" fill="#f59e0b"/></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 const LOGO_COLORS = ['#e11d48', '#2563eb', '#059669', '#d97706', '#7c3aed', '#0891b2', '#dc2626', '#4f46e5'];
 function channelLogo(i, name) {
   const words = String(name).split(' ');
-  const mark = esc(words.map((w) => w[0]).join('').slice(0, 3));
+  const mark = esc(
+    words
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 3)
+  );
   const c = LOGO_COLORS[i % LOGO_COLORS.length];
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect x="20" y="30" width="120" height="120" rx="26" fill="${c}"/><text x="80" y="110" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="52" fill="#fff">${mark}</text><text x="156" y="84" font-family="Arial,sans-serif" font-weight="800" font-size="38" fill="#f5f5f5">${esc(words[0] || '')}</text><text x="156" y="126" font-family="Arial,sans-serif" font-weight="600" font-size="30" fill="#a3a3a3">${esc(words.slice(1).join(' '))}</text></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -40,7 +63,21 @@ const backdropArt = (seed) => art(seed + 3, 1600, 900, '');
 function makeCatalog() {
   const r = rnd(42);
   const pick = (a) => a[Math.floor(r() * a.length)];
-  const liveCats = ['UK | Entertainment', 'UK | Sports', 'UK | News', 'US | Entertainment', 'US | Sports', 'DE | Allgemein', 'FR | Général', 'Kids', 'Documentary', 'Music', '4K UHD', 'PPV Events', 'Adult 18+']
+  const liveCats = [
+    'UK | Entertainment',
+    'UK | Sports',
+    'UK | News',
+    'US | Entertainment',
+    'US | Sports',
+    'DE | Allgemein',
+    'FR | Général',
+    'Kids',
+    'Documentary',
+    'Music',
+    '4K UHD',
+    'PPV Events',
+    'Adult 18+',
+  ]
     .concat(Array.from({ length: 28 }, (_, i) => `Region ${i + 1}`))
     .map((name, i) => ({ id: String(i + 1), name }));
   const live = Array.from({ length: 10000 }, (_, i) => ({
@@ -87,7 +124,23 @@ function makeCatalog() {
   };
 }
 
-const SHOWS = ['News at Ten', 'Premier Football Live', 'The Great Bake', 'Planet Wild', 'Late Show', 'Weather', 'Motor Racing', 'Antiques Hunt', 'Crime Files', 'Quiz Night', 'Documentary: Oceans', 'Cooking Live', 'Film: The Long Road', 'Kids Club', 'Music Hour'];
+const SHOWS = [
+  'News at Ten',
+  'Premier Football Live',
+  'The Great Bake',
+  'Planet Wild',
+  'Late Show',
+  'Weather',
+  'Motor Racing',
+  'Antiques Hunt',
+  'Crime Files',
+  'Quiz Night',
+  'Documentary: Oceans',
+  'Cooking Live',
+  'Film: The Long Road',
+  'Kids Club',
+  'Music Hour',
+];
 const DURS = [30, 30, 30, 60, 60, 60, 90, 120];
 /** Deterministic per-channel schedule with varied programme lengths. */
 function schedule(id, from, to) {
@@ -99,7 +152,13 @@ function schedule(id, from, to) {
   while (t < to) {
     const d = DURS[Math.floor(r() * DURS.length)] * 60e3;
     const title = SHOWS[Math.floor(r() * SHOWS.length)];
-    if (t + d > from) out.push({ start: t, stop: t + d, title, desc: `${title}: a demo programme description from the mock guide, long enough to check wrapping and readability on a large TV.` });
+    if (t + d > from)
+      out.push({
+        start: t,
+        stop: t + d,
+        title,
+        desc: `${title}: a demo programme description from the mock guide, long enough to check wrapping and readability on a large TV.`,
+      });
     t += d;
   }
   return out;
@@ -128,7 +187,42 @@ export function createMockApi() {
   const emit = (ch, data) => listeners.get(ch)?.forEach((cb) => cb(data));
   let catalog = null;
   let vol = { volume: 60, muted: false };
-  let settings = { overscan: 0, tmdbKey: '', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, theme: 'amber', trailers: true, audioDevice: 'auto', subMode: 'off', brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', audioLang: 'auto', audioDelayMs: 0, nightMode: 'off', passthrough: false, speakers: 'auto', artSource: 'prefer', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
+  let settings = {
+    overscan: 0,
+    tmdbKey: '',
+    logoSource: 'missing',
+    liveFormat: 'ts',
+    hwdec: 'auto-safe',
+    deinterlace: false,
+    mpvPath: '',
+    catalogTtlHours: 12,
+    epgTtlHours: 6,
+    osdTimeoutSec: 4,
+    screensaverMin: 3,
+    startFullscreen: true,
+    theme: 'amber',
+    trailers: true,
+    audioDevice: 'auto',
+    subMode: 'off',
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+    gamma: 0,
+    aspect: 'auto',
+    upscaling: 'standard',
+    deband: false,
+    toneMapping: 'auto',
+    audioLang: 'auto',
+    audioDelayMs: 0,
+    nightMode: 'off',
+    passthrough: false,
+    speakers: 'auto',
+    artSource: 'prefer',
+    subLang: 'en',
+    subSize: 'medium',
+    subBackground: 'box',
+    ...ls.get('settings', {}),
+  };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const bt = {
@@ -136,7 +230,10 @@ export function createMockApi() {
     found: [],
     devices: [{ mac: '98:7A:14:00:00:01', name: 'Xbox Wireless Controller', paired: true, connected: true, trusted: true, battery: 80, gamepad: true }],
   };
-  const btStatus = () => (bt.adapter ? { adapter: true, powered: true, blocked: false, discovering: false, devices: bt.devices } : { adapter: false, powered: false, blocked: false, discovering: false, devices: [] });
+  const btStatus = () =>
+    bt.adapter
+      ? { adapter: true, powered: true, blocked: false, discovering: false, devices: bt.devices }
+      : { adapter: false, powered: false, blocked: false, discovering: false, devices: [] };
   if (typeof window !== 'undefined') {
     window.mockBluetooth = (mode) => {
       bt.adapter = mode !== 'none';
@@ -154,7 +251,15 @@ export function createMockApi() {
   };
 
   const handlers = {
-    'app:info': () => ({ version: '1.0.0-web', platform: 'web', mpvPath: null, ytdlpPath: '/usr/bin/yt-dlp', dataDir: '(browser)', build: '2026.11.27-a0acc2f', updater: true }),
+    'app:info': () => ({
+      version: '1.0.0-web',
+      platform: 'web',
+      mpvPath: null,
+      ytdlpPath: '/usr/bin/yt-dlp',
+      dataDir: '(browser)',
+      build: '2026.11.27-a0acc2f',
+      updater: true,
+    }),
     'app:quit': () => emit('mock:quit'),
     'system:poweroff': () => emit('mock:quit'),
     'volume:change': ({ action }) => {
@@ -199,12 +304,16 @@ export function createMockApi() {
     },
     'audio:outputs': async () => {
       await wait(300);
-      return { backend: 'pactl', current: settings.audioDevice || 'auto', outputs: [
-        { id: 'auto', label: 'Automatic (TV via HDMI)' },
-        { id: 'pa:alsa_card.pci-0000_00_1f.3|output:hdmi-stereo', label: 'TV (HDMI)' },
-        { id: 'pa:alsa_card.pci-0000_00_1f.3|output:hdmi-stereo-extra1', label: 'TV (HDMI 2)' },
-        { id: 'pa:alsa_card.pci-0000_00_1f.3|output:analog-stereo', label: 'Headphone jack / speakers' },
-      ] };
+      return {
+        backend: 'pactl',
+        current: settings.audioDevice || 'auto',
+        outputs: [
+          { id: 'auto', label: 'Automatic (TV via HDMI)' },
+          { id: 'pa:alsa_card.pci-0000_00_1f.3|output:hdmi-stereo', label: 'TV (HDMI)' },
+          { id: 'pa:alsa_card.pci-0000_00_1f.3|output:hdmi-stereo-extra1', label: 'TV (HDMI 2)' },
+          { id: 'pa:alsa_card.pci-0000_00_1f.3|output:analog-stereo', label: 'Headphone jack / speakers' },
+        ],
+      };
     },
     'settings:update': (patch) => {
       const { showAdult: _a, adultPin: _p, ...safe } = patch || {};
@@ -235,7 +344,16 @@ export function createMockApi() {
     'epg:short': () => [],
     'vod:info': async ({ item }) => {
       await wait(150);
-      return { ...item, plot: 'A gripping demo synopsis that runs for a couple of lines to check wrapping and readability from ten feet away on a large OLED panel.', cast: 'Ada Lovelace, Alan Turing, Grace Hopper', director: 'Demo Director', genre: 'Drama, Thriller', year: '2024', duration: 6420, backdrop: '' };
+      return {
+        ...item,
+        plot: 'A gripping demo synopsis that runs for a couple of lines to check wrapping and readability from ten feet away on a large OLED panel.',
+        cast: 'Ada Lovelace, Alan Turing, Grace Hopper',
+        director: 'Demo Director',
+        genre: 'Drama, Thriller',
+        year: '2024',
+        duration: 6420,
+        backdrop: '',
+      };
     },
     'series:info': async ({ item }) => {
       await wait(150);
@@ -248,7 +366,16 @@ export function createMockApi() {
         seasons: [1, 2, 3].map((s) => ({
           season: s,
           name: `Season ${s}`,
-          episodes: Array.from({ length: 10 }, (_, e) => ({ kind: 'episode', id: item.id * 100 + s * 20 + e, season: s, episode: e + 1, name: `Episode ${e + 1}`, ext: 'mkv', duration: 2700, plot: 'Episode synopsis.' })),
+          episodes: Array.from({ length: 10 }, (_, e) => ({
+            kind: 'episode',
+            id: item.id * 100 + s * 20 + e,
+            season: s,
+            episode: e + 1,
+            name: `Episode ${e + 1}`,
+            ext: 'mkv',
+            duration: 2700,
+            plot: 'Episode synopsis.',
+          })),
         })),
       };
     },
@@ -272,7 +399,14 @@ export function createMockApi() {
     },
     'system:update:check': async () => {
       await wait(700);
-      return { available: true, system: 42, appInstalled: '2026.11.27-a0acc2f', appLatest: '2026.11.27-c4e91b2', repo: 'ParkPilot-AI/oled-iptv-stb', hasToken: true };
+      return {
+        available: true,
+        system: 42,
+        appInstalled: '2026.11.27-a0acc2f',
+        appLatest: '2026.11.27-c4e91b2',
+        repo: 'ParkPilot-AI/oled-iptv-stb',
+        hasToken: true,
+      };
     },
     'system:update:run': () => {
       const steps = [
@@ -295,6 +429,34 @@ export function createMockApi() {
       return { started: true };
     },
     'system:reboot': () => setTimeout(() => location.reload(), 500),
+    // Games (dev console: localStorage 'mock:gfn'='1' → installed).
+    'games:status': () => ({
+      platform: 'linux',
+      installed: localStorage.getItem('mock:gfn') === '1',
+      version: localStorage.getItem('mock:gfn') === '1' ? '2.0.80' : null,
+      flatpak: true,
+      running: false,
+    }),
+    'games:install': () => {
+      const steps = [
+        [300, { type: 'step', text: "Adding NVIDIA's GeForce NOW repository" }],
+        [1200, { type: 'step', text: 'Downloading and installing GeForce NOW (this can take a few minutes)' }],
+        [1600, { type: 'line', text: 'Installing 1/2… org.freedesktop.Platform' }],
+        [2600, { type: 'line', text: 'Installing 2/2… com.nvidia.geforcenow' }],
+        [3400, { type: 'step', text: 'Installed GeForce NOW 2.0.80' }],
+        [3500, { type: 'done' }],
+        [3600, { type: 'exit', code: 0 }],
+      ];
+      setTimeout(() => localStorage.setItem('mock:gfn', '1'), 3300);
+      for (const [ms, ev] of steps) setTimeout(() => emit('system:update:progress', ev), ms);
+      return { started: true };
+    },
+    'games:launch': () => {
+      if (localStorage.getItem('mock:gfn') !== '1') throw new Error('Install GeForce NOW first');
+      emit('games:state', { running: true });
+      setTimeout(() => emit('games:state', { running: false, code: 0 }), 4000);
+      return { running: true };
+    },
     // Bluetooth (dev console: mockBluetooth('none') for "no adapter", mockBluetooth('on') to plug one in).
     'bt:status': () => btStatus(),
     'bt:scan': async ({ seconds = 12 } = {}) => {
@@ -330,7 +492,11 @@ export function createMockApi() {
     },
     'bt:openSystemSettings': () => null,
     // Provisioning (dev console: localStorage.setItem('mock:provision', 'needed'), reload).
-    'system:provision:status': () => ({ available: true, needed: localStorage.getItem('mock:provision') === 'needed', missing: ['bluez-utils', 'flatpak', 'bluetooth.service'] }),
+    'system:provision:status': () => ({
+      available: true,
+      needed: localStorage.getItem('mock:provision') === 'needed',
+      missing: ['bluez-utils', 'flatpak', 'bluetooth.service'],
+    }),
     'system:provision:run': () => {
       const steps = [
         [300, { type: 'step', text: 'Checking Bluetooth and Games support' }],
@@ -353,7 +519,16 @@ export function createMockApi() {
       const items = kind === 'tv' ? catalog.series.items : catalog.vod.items;
       const fake = (it) => {
         const m = /^(.*?)\s*\((\d{4})\)$/.exec(it.name);
-        return { id: 900000 + it.id, title: m ? m[1] : it.name, original: '', year: m ? m[2] : it.year || '', overview: `Trending pick: ${m ? m[1] : it.name}. A demo synopsis for the spotlight carousel.`, backdrop: backdropArt(it.id), poster: null, rating: 7.8 };
+        return {
+          id: 900000 + it.id,
+          title: m ? m[1] : it.name,
+          original: '',
+          year: m ? m[2] : it.year || '',
+          overview: `Trending pick: ${m ? m[1] : it.name}. A demo synopsis for the spotlight carousel.`,
+          backdrop: backdropArt(it.id),
+          poster: null,
+          rating: 7.8,
+        };
       };
       const list = (off, step) => Array.from({ length: 40 }, (_, i) => fake(items[(off + i * step) % items.length]));
       const hash = (n) => [...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 997, 7);
@@ -365,7 +540,16 @@ export function createMockApi() {
       const items = item.kind === 'series' ? catalog.series.items : catalog.vod.items;
       const results = Array.from({ length: 20 }, (_, i) => items[(item.id * 7 + i * 13) % items.length]).map((it) => {
         const m = /^(.*?)\s*\((\d{4})\)$/.exec(it.name);
-        return { id: 900000 + it.id, title: m ? m[1] : it.name, original: '', year: m ? m[2] : it.year || '', overview: '', backdrop: backdropArt(it.id), poster: null, rating: 7 };
+        return {
+          id: 900000 + it.id,
+          title: m ? m[1] : it.name,
+          original: '',
+          year: m ? m[2] : it.year || '',
+          overview: '',
+          backdrop: backdropArt(it.id),
+          poster: null,
+          rating: 7,
+        };
       });
       return { source: 1, results };
     },
@@ -408,12 +592,56 @@ export function createMockApi() {
   let osdDemo = null;
   if (typeof location !== 'undefined' && location.hash.startsWith('#osd')) {
     const kind = location.hash.includes('vod') ? 'movie' : 'live';
-    const names = ['Nova Sport HD', 'Metro News', 'Planet Wild 4K', 'Retro Gold', 'Sky Arena', 'Ocean One', 'Prime Cinema HD', 'Kids Club', 'Echo Music', 'Royal Docs'];
-    const items = Array.from({ length: 50 }, (_, i) => { const name = `${names[i % names.length]}${i >= 10 ? ` ${Math.floor(i / 10) + 1}` : ''}`; return { kind: 'live', id: 1001 + i, num: 101 + i, name, epg: `ch${i + 1}`, icon: channelLogo(i, name) }; });
-    osdDemo = { items, index: 0, jump(i) { this.index = (i + items.length) % items.length; } };
+    const names = [
+      'Nova Sport HD',
+      'Metro News',
+      'Planet Wild 4K',
+      'Retro Gold',
+      'Sky Arena',
+      'Ocean One',
+      'Prime Cinema HD',
+      'Kids Club',
+      'Echo Music',
+      'Royal Docs',
+    ];
+    const items = Array.from({ length: 50 }, (_, i) => {
+      const name = `${names[i % names.length]}${i >= 10 ? ` ${Math.floor(i / 10) + 1}` : ''}`;
+      return { kind: 'live', id: 1001 + i, num: 101 + i, name, epg: `ch${i + 1}`, icon: channelLogo(i, name) };
+    });
+    osdDemo = {
+      items,
+      index: 0,
+      jump(i) {
+        this.index = (i + items.length) % items.length;
+      },
+    };
     const episode = { kind: 'episode', id: 9, name: 'Episode 3', seriesName: 'Metro Chronicles', season: 1, episode: 3, icon: '' };
     let pos = 1234;
-    const st = () => ({ active: true, profileId: 'demo', kind: kind === 'live' ? 'live' : 'episode', index: osdDemo.index, total: 50, item: kind === 'live' ? items[osdDemo.index] : episode, pos, dur: kind === 'live' ? 0 : 2700, paused: false, buffering: false, cacheSecs: 12, info: { width: 3840, height: 2160, vcodec: 'hevc (Main 10)', acodec: 'eac3', channels: '5.1', fps: 50, vbitrate: 18500000, abitrate: 640000, hwdec: 'd3d11va' }, tracks: { audio: [], sub: [] } });
+    const st = () => ({
+      active: true,
+      profileId: 'demo',
+      kind: kind === 'live' ? 'live' : 'episode',
+      index: osdDemo.index,
+      total: 50,
+      item: kind === 'live' ? items[osdDemo.index] : episode,
+      pos,
+      dur: kind === 'live' ? 0 : 2700,
+      paused: false,
+      buffering: false,
+      cacheSecs: 12,
+      info: {
+        width: 3840,
+        height: 2160,
+        vcodec: 'hevc (Main 10)',
+        acodec: 'eac3',
+        channels: '5.1',
+        fps: 50,
+        vbitrate: 18500000,
+        abitrate: 640000,
+        hwdec: 'd3d11va',
+      },
+      tracks: { audio: [], sub: [] },
+    });
     setTimeout(() => emit('player:state', st()), 100);
     setInterval(() => {
       pos += 1;

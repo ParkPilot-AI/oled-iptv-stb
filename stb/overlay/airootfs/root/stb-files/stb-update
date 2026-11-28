@@ -5,6 +5,8 @@
 #   stb-update provision → install packages/services/config added since the box was
 #                      set up (Bluetooth, Games); quick no-op when nothing is missing
 #   stb-update reboot  → reboot the box
+#   stb-update games status|install|update → GeForce NOW Flatpak (status is JSON,
+#                      install/update print '@@' progress)
 #   stb-update bt status|scan [secs]|pair|connect|disconnect|forget <mac> → JSON
 #   stb-update wifi status|scan|connect <ssid>|forget <ssid>
 #                      → JSON; connect reads the passphrase from stdin
@@ -171,6 +173,7 @@ cmd_run() {
   # needs now (e.g. Bluetooth, Flatpak). Uses the list from the app just installed.
   say "STEP Checking Bluetooth and Games support"
   provision "$APP/stb-system" 0
+  games_update # keeps GeForce NOW current with the normal 'Update system' button
 
   # The running kernel's modules are removed when a new kernel is installed.
   if [[ ! -d /usr/lib/modules/$(uname -r) ]]; then
@@ -393,13 +396,64 @@ cmd_bt() {
   esac
 }
 
+# ---------------------------------------------------------------- Games (GeForce NOW)
+# NVIDIA's official GeForce NOW app for Linux is a Flatpak from NVIDIA's own repo
+# (not Flathub); its runtime (org.freedesktop.Platform) comes from Flathub.
+# Source: NVIDIA's Linux install commands, as documented on the Arch Wiki
+# (https://wiki.archlinux.org/title/NVIDIA_GeForce_NOW) and NVIDIA's system
+# requirements page (https://www.nvidia.com/en-us/geforce-now/system-reqs/).
+GFN_REMOTE=GeForceNOW
+GFN_REPO_URL=https://international.download.nvidia.com/GFNLinux/flatpak/geforcenow.flatpakrepo
+GFN_APP_ID=com.nvidia.geforcenow
+FLATHUB_URL=https://dl.flathub.org/repo/flathub.flatpakrepo
+
+gfn_version() { flatpak info --system "$GFN_APP_ID" 2>/dev/null | sed -n 's/^[[:space:]]*Version:[[:space:]]*//p' | head -n1; }
+gfn_installed() { flatpak info --system "$GFN_APP_ID" >/dev/null 2>&1; }
+
+games_update() {
+  command -v flatpak >/dev/null 2>&1 && gfn_installed || return 0
+  say "STEP Updating GeForce NOW"
+  flatpak update -y --noninteractive --system "$GFN_APP_ID" || say "STEP GeForce NOW update failed — will retry next time"
+}
+
+cmd_games() {
+  case ${1:-} in
+    status)
+      if ! command -v flatpak >/dev/null 2>&1; then
+        jq -cn '{installed: false, version: null, flatpak: false}'
+      else
+        jq -cn --arg v "$(gfn_version)" --argjson i "$(gfn_installed && echo true || echo false)" '{installed: $i, version: (if $v == "" then null else $v end), flatpak: true}'
+      fi ;;
+    install)
+      exec 9>"$LOCK"
+      flock -n 9 || fail "An update is already running"
+      exec > >(tee -a "$LOG") 2>&1
+      echo "=== $(date -Is) GeForce NOW install started ==="
+      command -v flatpak >/dev/null 2>&1 || fail "Flatpak isn't installed yet — run 'Finish installing the update' first"
+      say "STEP Adding NVIDIA's GeForce NOW repository"
+      flatpak remote-add --system --if-not-exists flathub "$FLATHUB_URL" || fail "Couldn't add Flathub (network?)"
+      flatpak remote-add --system --if-not-exists "$GFN_REMOTE" "$GFN_REPO_URL" || fail "Couldn't add NVIDIA's repository (network?)"
+      say "STEP Downloading and installing GeForce NOW (this can take a few minutes)"
+      flatpak install -y --noninteractive --system "$GFN_REMOTE" "$GFN_APP_ID" || fail "GeForce NOW install failed — see $LOG"
+      say "STEP Installed GeForce NOW $(gfn_version)"
+      say "DONE" ;;
+    update)
+      exec 9>"$LOCK"
+      flock -n 9 || fail "An update is already running"
+      games_update
+      say "DONE" ;;
+    *) echo '{"error":"usage: games status|install|update"}'; return 2 ;;
+  esac
+}
+
 case ${1:-} in
   wifi) shift; cmd_wifi "$@" ;;
   bt) shift; cmd_bt "$@" ;;
+  games) shift; cmd_games "$@" ;;
   check) cmd_check ;;
   provision) cmd_provision ;;
   run) cmd_run ;;
   reboot) systemctl reboot ;;
   poweroff) systemctl poweroff ;;
-  *) echo "usage: stb-update check|run|provision|reboot|poweroff|wifi ...|bt ..." >&2; exit 2 ;;
+  *) echo "usage: stb-update check|run|provision|reboot|poweroff|wifi ...|bt ...|games status|install|update" >&2; exit 2 ;;
 esac

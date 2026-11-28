@@ -17,6 +17,7 @@ import { Library } from './views/Library.jsx';
 import { Favorites } from './views/Favorites.jsx';
 import { Search } from './views/Search.jsx';
 import { Settings } from './views/Settings.jsx';
+import { Games } from './views/Games.jsx';
 import { MovieDetail } from './views/MovieDetail.jsx';
 import { SeriesDetail } from './views/SeriesDetail.jsx';
 
@@ -38,10 +39,21 @@ const UI_SCREENSAVER_MS = 10 * 60 * 1000;
 function MainApp() {
   const bootState = useStore((s) => s.boot);
   const rootRef = useRef(null);
-  const [idle, setIdle] = useIdle(UI_SCREENSAVER_MS);
+  // While GeForce NOW has the screen, ONYX is hidden: no screensaver or pixel shift.
+  const gamesRunning = useStore((s) => s.gamesRunning);
+  const [idle, setIdle] = useIdle(UI_SCREENSAVER_MS, !gamesRunning);
   const idleRef = useRef(idle);
   idleRef.current = idle;
-  usePixelShift(rootRef);
+  usePixelShift(rootRef, 120000, !gamesRunning);
+  useEffect(
+    () =>
+      api.on('games:state', ({ running }) => {
+        setState({ gamesRunning: running });
+        // Back from GeForce NOW: focus returns to the Games item in the menu.
+        if (!running) requestAnimationFrame(() => focusByKey('rail-games') || focusGroup('rail'));
+      }),
+    []
+  );
 
   useEffect(() => {
     boot().catch((e) => setState({ boot: 'login', catalogStatus: { error: e.message } }));
@@ -186,7 +198,7 @@ function Shell() {
     { priority: -100 }
   );
 
-  const View = { home: Home, live: LiveTV, movies: Library, series: Library, favorites: Favorites, search: Search, settings: Settings }[section];
+  const View = { home: Home, live: LiveTV, movies: Library, series: Library, favorites: Favorites, search: Search, settings: Settings, games: Games }[section];
 
   return (
     <div className="shell">

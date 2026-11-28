@@ -14,6 +14,15 @@
   </desktops>
   <keyboard>
     <chainQuitKey>C-g</chainQuitKey>
+    <!-- Emergency exit from Games: ONYX gets no key presses while GeForce NOW has
+         focus, so openbox closes it; ONYX notices and comes back on its own.
+         Ctrl+Alt+Home on a keyboard, or the Home key many air-mouse remotes send. -->
+    <keybind key="C-A-Home">
+      <action name="Execute"><command>flatpak kill com.nvidia.geforcenow</command></action>
+    </keybind>
+    <keybind key="XF86HomePage">
+      <action name="Execute"><command>flatpak kill com.nvidia.geforcenow</command></action>
+    </keybind>
   </keyboard>
   <mouse/>
   <applications>
@@ -27,6 +36,15 @@
       <focus>no</focus>
       <fullscreen>yes</fullscreen>
       <layer>normal</layer>
+    </application>
+    <!-- GeForce NOW (official Flatpak): full screen, undecorated, focused.
+         Its X11 WM_CLASS is "GeForceNOW", "GeForceNOW" (as reported by xprop
+         for com.nvidia.geforcenow; check with `xprop WM_CLASS` if NVIDIA changes it). -->
+    <application class="GeForceNOW">
+      <decor>no</decor>
+      <fullscreen>yes</fullscreen>
+      <focus>yes</focus>
+      <layer>above</layer>
     </application>
   </applications>
 </openbox_config>
