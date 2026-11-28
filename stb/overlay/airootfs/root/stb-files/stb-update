@@ -5,6 +5,7 @@
 #   stb-update provision → install packages/services/config added since the box was
 #                      set up (Bluetooth, Games); quick no-op when nothing is missing
 #   stb-update reboot  → reboot the box
+#   stb-update bt status|scan [secs]|pair|connect|disconnect|forget <mac> → JSON
 #   stb-update wifi status|scan|connect <ssid>|forget <ssid>
 #                      → JSON; connect reads the passphrase from stdin
 # Progress protocol: lines starting with "@@ " are machine-readable
@@ -256,12 +257,149 @@ cmd_wifi() {
   esac
 }
 
+# ---------------------------------------------------------------- Bluetooth
+# Game controllers via BlueZ (bluetoothctl, non-interactive). Every command prints
+# one JSON line. MAC addresses are validated before they reach any command.
+BT_SYS=${STB_BT_SYS:-/sys/class/bluetooth}
+BT_GAMEPAD_RE='xbox|dualsense|dualshock|wireless controller|pro controller|8bitdo'
+
+btctl() { timeout "${2:-10}" bluetoothctl $1 2>/dev/null; } # btctl "<args>" [seconds]
+
+valid_mac() { [[ $1 =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]]; }
+
+bt_has_adapter() {
+  compgen -G "$BT_SYS/hci*" >/dev/null || return 1
+  systemctl is-active --quiet bluetooth.service 2>/dev/null || pgrep -x bluetoothd >/dev/null 2>&1 || return 1
+  # (not grep -q: with pipefail, closing the pipe early would count as a failure)
+  [[ $(btctl show) == *Controller\ * ]]
+}
+
+# One device as JSON, from `bluetoothctl info <mac>`.
+bt_device() {
+  local mac=$1 info name icon
+  info=$(btctl "info $mac")
+  name=$(sed -n 's/^[[:space:]]*Name: //p' <<<"$info" | head -n1)
+  [[ -z $name ]] && name=$(sed -n 's/^[[:space:]]*Alias: //p' <<<"$info" | head -n1)
+  icon=$(sed -n 's/^[[:space:]]*Icon: //p' <<<"$info" | head -n1)
+  jq -cn --arg mac "${mac^^}" --arg name "${name:-$mac}" --arg icon "$icon" --arg re "$BT_GAMEPAD_RE" \
+    --arg paired "$(sed -n 's/^[[:space:]]*Paired: //p' <<<"$info" | head -n1)" \
+    --arg connected "$(sed -n 's/^[[:space:]]*Connected: //p' <<<"$info" | head -n1)" \
+    --arg trusted "$(sed -n 's/^[[:space:]]*Trusted: //p' <<<"$info" | head -n1)" \
+    --arg battery "$(sed -n 's/^[[:space:]]*Battery Percentage: .*(\([0-9]*\)).*/\1/p' <<<"$info" | head -n1)" \
+    '{mac: $mac, name: $name, paired: ($paired == "yes"), connected: ($connected == "yes"), trusted: ($trusted == "yes"),
+      battery: ($battery | tonumber? // null),
+      gamepad: ($icon == "input-gaming" or ($name | test($re; "i")))}'
+}
+
+# Devices as a JSON array: all known ones, or only paired (arg "paired").
+bt_devices() {
+  local filter=${1:-} line mac
+  local -a devs=()
+  while IFS= read -r line; do
+    mac=$(awk '{print $2}' <<<"$line")
+    valid_mac "$mac" || continue
+    devs+=("$(bt_device "$mac")")
+  done < <(btctl devices | grep '^Device ')
+  ((${#devs[@]})) || { echo '[]'; return; }
+  printf '%s\n' "${devs[@]}" | jq -cs --arg f "$filter" 'map(select(. != null)) | if $f == "paired" then map(select(.paired)) else . end'
+}
+
+bt_status() {
+  if ! bt_has_adapter; then
+    jq -cn '{adapter: false, powered: false, blocked: false, discovering: false, devices: []}'
+    return 0
+  fi
+  local rf blocked=false show
+  rf=$(rfkill list bluetooth 2>/dev/null)
+  if grep -q 'Hard blocked: yes' <<<"$rf"; then
+    blocked=true
+  elif grep -q 'Soft blocked: yes' <<<"$rf"; then
+    rfkill unblock bluetooth >/dev/null 2>&1 || true
+    sleep 1
+  fi
+  show=$(btctl show)
+  if [[ $blocked == false ]] && grep -q 'Powered: no' <<<"$show"; then
+    btctl "power on" >/dev/null
+    show=$(btctl show)
+  fi
+  jq -cn --argjson blocked "$blocked" --argjson devices "$(bt_devices paired)" \
+    --arg powered "$(sed -n 's/^[[:space:]]*Powered: //p' <<<"$show" | head -n1)" \
+    --arg disc "$(sed -n 's/^[[:space:]]*Discovering: //p' <<<"$show" | head -n1)" \
+    '{adapter: true, powered: ($powered == "yes"), blocked: $blocked, discovering: ($disc == "yes"), devices: $devices}'
+}
+
+# Plain-English reason for a failed pair/connect.
+bt_error() {
+  local msg=$1
+  case $msg in
+    *"not available"* | *ConnectionAttemptFailed* | *"Page Timeout"* | *"timed out"* | *Timeout* | "")
+      echo "Controller not in pairing mode — hold the pair button until the Xbox button flashes quickly" ;;
+    *AuthenticationFailed* | *AuthenticationRejected* | *AuthenticationCanceled*)
+      echo "The controller refused to pair — switch it off and on, then try again" ;;
+    *"Not Powered"* | *NotReady*) echo "Bluetooth is off" ;;
+    *InProgress*) echo "Already pairing — wait a moment and try again" ;;
+    *) echo "Couldn't pair: $(grep -o 'org.bluez.Error.[A-Za-z]*\|Failed[^.]*' <<<"$msg" | head -n1)" ;;
+  esac
+}
+
+cmd_bt() {
+  local sub=${1:-} mac=${2:-}
+  if [[ $sub != status && $sub != scan ]]; then
+    valid_mac "$mac" || { jq -cn '{ok: false, error: "Invalid controller address"}'; return 1; }
+    mac=${mac^^}
+  fi
+  if [[ $sub != status ]] && ! bt_has_adapter; then
+    jq -cn '{ok: false, adapter: false, error: "No Bluetooth adapter found"}'
+    return 1
+  fi
+  case $sub in
+    status) bt_status ;;
+    scan)
+      local secs=${2:-12}
+      [[ $secs =~ ^[0-9]+$ ]] || secs=12
+      ((secs < 3)) && secs=3
+      ((secs > 30)) && secs=30
+      btctl "--timeout $secs scan on" $((secs + 5)) >/dev/null
+      # Not-yet-paired controllers first, then other new devices, then known ones.
+      jq -cn --argjson d "$(bt_devices)" '{adapter: true, devices: ($d | sort_by([.paired, (.gamepad | not), .name]))}' ;;
+    pair)
+      local out
+      # Keep discovery running while pairing: LE controllers only answer while scanned.
+      btctl "--timeout 40 scan on" 45 >/dev/null &
+      local scan_pid=$!
+      out=$(btctl "--timeout 30 pair $mac" 35)
+      if ! grep -q 'Pairing successful\|AlreadyExists' <<<"$out"; then
+        kill "$scan_pid" 2>/dev/null
+        jq -cn --arg e "$(bt_error "$out")" '{ok: false, error: $e}'
+        return 1
+      fi
+      btctl "trust $mac" >/dev/null
+      out=$(btctl "--timeout 15 connect $mac" 20)
+      kill "$scan_pid" 2>/dev/null
+      btctl "scan off" >/dev/null
+      if grep -q 'Connection successful' <<<"$out"; then jq -cn --argjson d "$(bt_device "$mac")" '{ok: true, device: $d}'
+      else jq -cn --argjson d "$(bt_device "$mac")" '{ok: true, device: $d, warning: "Paired. Press the Xbox button to connect."}'; fi ;;
+    connect)
+      local out; out=$(btctl "--timeout 15 connect $mac" 20)
+      if grep -q 'Connection successful' <<<"$out"; then jq -cn --argjson d "$(bt_device "$mac")" '{ok: true, device: $d}'
+      else jq -cn '{ok: false, error: "Couldn'"'"'t connect — switch the controller on (press the Xbox button) and try again"}'; return 1; fi ;;
+    disconnect)
+      btctl "disconnect $mac" >/dev/null
+      jq -cn --argjson d "$(bt_device "$mac")" '{ok: true, device: $d}' ;;
+    forget)
+      btctl "remove $mac" >/dev/null
+      jq -cn '{ok: true}' ;;
+    *) jq -cn '{ok: false, error: "usage: bt status|scan [secs]|pair|connect|disconnect|forget <mac>"}'; return 2 ;;
+  esac
+}
+
 case ${1:-} in
   wifi) shift; cmd_wifi "$@" ;;
+  bt) shift; cmd_bt "$@" ;;
   check) cmd_check ;;
   provision) cmd_provision ;;
   run) cmd_run ;;
   reboot) systemctl reboot ;;
   poweroff) systemctl poweroff ;;
-  *) echo "usage: stb-update check|run|provision|reboot|poweroff|wifi ..." >&2; exit 2 ;;
+  *) echo "usage: stb-update check|run|provision|reboot|poweroff|wifi ...|bt ..." >&2; exit 2 ;;
 esac
