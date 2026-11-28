@@ -187,7 +187,7 @@ export function toggleFavorite(item) {
   const next = { ...favs, [k]: on ? favs[k].filter((f) => f.id !== item.id) : [clean(item), ...favs[k]] };
   setState({ favorites: next });
   api.invoke('doc:set', { profileId: state.profileId, name: 'favorites', data: next });
-  toast(on ? `Removed “${item.name}” from Favorites` : `Added “${item.name}” to Favorites`);
+  toast(on ? `Removed “${item.name}” from Favourites` : `Added “${item.name}” to Favourites`);
 }
 
 /** Registry so the global F key can find the item behind the focused element. */

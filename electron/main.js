@@ -18,6 +18,7 @@ import { Player } from './player.js';
 import { getArtwork, testTmdbKey, clearArtworkCache } from './artwork.js';
 import { resolveMpvBinary } from './mpv.js';
 import * as audio from './audio.js';
+import { userDataDir } from './paths.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -32,7 +33,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
 // Optional override (portable installs, tests): keep all data in a given folder.
-if (process.env.IPTV_USER_DATA) app.setPath('userData', process.env.IPTV_USER_DATA);
+// Keep the pre-ONYX data folder (profiles, settings, favourites) — see electron/paths.js.
+app.setPath('userData', userDataDir(app.getPath('appData'), process.env.IPTV_USER_DATA));
 if (!app.requestSingleInstanceLock()) app.quit();
 registerImageScheme();
 // Keep animations smooth on integrated GPUs; never throttle the overlay.

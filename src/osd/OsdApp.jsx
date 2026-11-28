@@ -98,13 +98,13 @@ export default function OsdApp() {
   const toggleFav = useCallback(async () => {
     const s = stRef.current;
     const it = s.item;
-    if (it.kind === 'episode') return flash('Add the series to Favorites from its page');
+    if (it.kind === 'episode') return flash('Add the series to Favourites from its page');
     const k = it.kind === 'live' ? 'live' : 'movie';
     const favs = { live: [], movie: [], series: [], ...(await api.invoke('doc:get', { profileId: s.profileId, name: 'favorites' })) };
     const on = favs[k].some((f) => f.id === it.id);
     favs[k] = on ? favs[k].filter((f) => f.id !== it.id) : [it, ...favs[k]];
     await api.invoke('doc:set', { profileId: s.profileId, name: 'favorites', data: favs });
-    flash(on ? 'Removed from Favorites' : 'Added to Favorites');
+    flash(on ? 'Removed from Favourites' : 'Added to Favourites');
   }, [flash]);
 
   const handle = useCallback(

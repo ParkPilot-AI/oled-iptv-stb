@@ -100,7 +100,7 @@ export function MovieDetail({ item }) {
               <Icon name="play" /> {resumable ? 'Play from start' : 'Play'}
             </Focusable>
             <Focusable className={`btn ${fav ? 'is-on' : ''}`} onSelect={() => toggleFavorite(item)}>
-              <Icon name="star" /> {fav ? 'In Favorites' : 'Add to Favorites'}
+              <Icon name="star" /> {fav ? 'In Favourites' : 'Add to Favourites'}
             </Focusable>
           </div>
         </div>

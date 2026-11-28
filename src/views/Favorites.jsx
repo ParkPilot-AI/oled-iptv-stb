@@ -9,7 +9,7 @@ export function Favorites() {
   return (
     <div className="home">
       <header className="page-head">
-        <h1>Favorites</h1>
+        <h1>Favourites</h1>
       </header>
       {!total && <p className="empty big">Press F on any channel, movie or series to add it here.</p>}
       <Carousel title="Channels" group="fav-live" count={favs.live.length}>

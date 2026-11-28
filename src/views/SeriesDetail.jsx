@@ -75,7 +75,7 @@ export function SeriesDetail({ item }) {
               </Focusable>
             )}
             <Focusable className={`btn ${fav ? 'is-on' : ''}`} data-nav-right=".seasons [data-focus-default]" onSelect={() => toggleFavorite(item)}>
-              <Icon name="star" /> {fav ? 'In Favorites' : 'Add to Favorites'}
+              <Icon name="star" /> {fav ? 'In Favourites' : 'Add to Favourites'}
             </Focusable>
           </div>
         </div>
