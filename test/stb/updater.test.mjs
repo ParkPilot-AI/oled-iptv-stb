@@ -52,7 +52,8 @@ esac`
   fs.writeFileSync(path.join(build, 'chrome-sandbox'), 'x');
   fs.writeFileSync(path.join(build, 'stb-version.txt'), `${latest}\n`);
   fs.mkdirSync(path.join(build, 'stb-system'));
-  fs.writeFileSync(path.join(build, 'stb-system', 'stb-update'), '#!/bin/bash\n# new helper\n');
+  // The "new" helper is the real script plus a marker, so a run that hands over to it works.
+  fs.writeFileSync(path.join(build, 'stb-system', 'stb-update'), fs.readFileSync(SCRIPT, 'utf8') + '\n# new helper\n', { mode: 0o755 });
   fs.writeFileSync(path.join(build, 'stb-system', 'nm-stb.conf'), '[device]\n');
   fs.writeFileSync(path.join(build, 'stb-system', 'packages.txt'), '# Base\nbase linux   mpv\n\n# Bluetooth + game controllers\nbluez bluez-utils flatpak # comment after\nxdg-desktop-portal-gtk\n');
   fs.writeFileSync(path.join(build, 'stb-system', 'bluetooth-main.conf'), '[General]\nControllerMode = dual\n');
