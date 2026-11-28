@@ -21,6 +21,7 @@ import { Favorites } from './views/Favorites.jsx';
 import { Search } from './views/Search.jsx';
 import { Settings } from './views/Settings.jsx';
 import { Games } from './views/Games.jsx';
+import { WhoIsWatching } from './views/WhoIsWatching.jsx';
 import { MovieDetail } from './views/MovieDetail.jsx';
 import { SeriesDetail } from './views/SeriesDetail.jsx';
 
@@ -127,6 +128,7 @@ function MainApp() {
   return (
     <div className="app" ref={rootRef}>
       {bootState === 'loading' && <Splash text="Starting…" />}
+      {bootState === 'viewer' && <WhoIsWatching />}
       {bootState === 'login' && <Login />}
       {bootState === 'catalog' && <CatalogLoading />}
       {bootState === 'ready' && <Shell />}

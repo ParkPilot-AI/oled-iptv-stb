@@ -26,6 +26,7 @@ import { createGames, GFN_DOWNLOAD_URL } from './games.js';
 import { watchSignin, createSigninWindow, signinDir } from './signin.js';
 import { pipRect, mpvGeometry } from './pip.js';
 import { createPhoneLogin } from './phonelogin.js';
+import * as viewers from './viewers.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -432,9 +433,60 @@ const handlers = {
     if ('audioDevice' in patch) await audio.applyOutput(patch.audioDevice);
     const s = await store.updateSettings(patch);
     if (Object.keys(patch).some((k) => LIVE_KEYS.has(k))) await player.applySettings(s);
+    if ('theme' in patch) {
+      // Each household profile keeps its own theme.
+      const db = await store.loadViewers();
+      viewers.saveViewer(db, { id: db.activeId, theme: patch.theme });
+      await store.saveViewers();
+    }
     return adult.publicSettings(s);
   },
-  'adult:show': async (arg) => adult.publicSettings(await store.updateSettings(adult.showAdultPatch(await store.getSettings(), arg || {}))),
+  'adult:show': async (arg) => {
+    if (arg?.show && (await activeViewerObj())?.kids) throw new Error('Not available on a Kids profile');
+    return adult.publicSettings(await store.updateSettings(adult.showAdultPatch(await store.getSettings(), arg || {})));
+  },
+
+  // Household profiles ("Who's watching?")
+  'viewers:list': async () => viewers.publicViewers(await store.loadViewers()),
+  'viewers:activate': async ({ id, pin } = {}) => {
+    const db = await store.loadViewers();
+    const v = viewers.checkViewerPin(db, id, pin);
+    if (db.activeId !== id && player.active) await player.stop({ reason: 'viewer' });
+    db.activeId = id;
+    await store.saveViewers();
+    store.setActiveViewer(id);
+    const s = v.theme ? await store.updateSettings({ theme: v.theme }) : await store.getSettings();
+    return { viewer: viewers.publicViewer(v), settings: adult.publicSettings(s) };
+  },
+  'viewers:save': async ({ id, name, kids, pin } = {}) => {
+    const db = await store.loadViewers();
+    viewers.assertCanManage(db, id, pin);
+    const v = viewers.saveViewer(db, { id, name, kids });
+    await store.saveViewers();
+    return viewers.publicViewer(v);
+  },
+  'viewers:pin': async ({ id, pin, current } = {}) => {
+    const db = await store.loadViewers();
+    viewers.assertCanManage(db, id, current);
+    viewers.setViewerPin(db, id, { pin, current });
+    await store.saveViewers();
+    return viewers.publicViewers(db);
+  },
+  'viewers:remove': async ({ id, pin } = {}) => {
+    const db = await store.loadViewers();
+    viewers.assertCanManage(db, id, pin);
+    viewers.removeViewer(db, id);
+    await store.saveViewers();
+    store.setActiveViewer(db.activeId);
+    return viewers.publicViewers(db);
+  },
+  'viewers:askOnStart': async ({ on } = {}) => {
+    const db = await store.loadViewers();
+    viewers.assertCanManage(db);
+    db.askOnStart = !!on;
+    await store.saveViewers();
+    return viewers.publicViewers(db);
+  },
   'adult:pin': async (arg) => adult.publicSettings(await store.updateSettings(adult.pinPatch(await store.getSettings(), arg || {}))),
   'volume:change': async ({ action }) => {
     let r = await audio.systemVolume(action).catch(() => null);
@@ -537,8 +589,14 @@ function openSignin(url) {
   signinWin = createSigninWindow(BrowserWindow, url, { onClosed: () => (signinWin = null) });
 }
 
+async function activeViewerObj() {
+  const db = await store.loadViewers();
+  return db.list.find((v) => v.id === db.activeId) || null;
+}
+
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  store.setActiveViewer((await store.loadViewers()).activeId);
   if (process.platform === 'linux' && hasUpdater()) {
     try {
       watchSignin({ dir: signinDir(), open: openSignin });

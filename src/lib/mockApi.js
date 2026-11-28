@@ -224,6 +224,11 @@ export function createMockApi() {
     ...ls.get('settings', {}),
   };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
+  const viewersDb = ls.get('viewers', { activeId: 'main', askOnStart: true, list: [{ id: 'main', name: 'Me', colour: '#E50914', kids: false, pin: '' }] });
+  const saveViewersDb = () => ls.set('viewers', viewersDb);
+  const docKey = (profileId, name) => (viewersDb.activeId === 'main' ? `${profileId}:${name}` : `${profileId}:${viewersDb.activeId}:${name}`);
+  const pubViewer = (v) => ({ id: v.id, name: v.name, colour: v.colour, kids: !!v.kids, locked: !!v.pin, theme: v.theme || null });
+  const viewersPublic = () => ({ activeId: viewersDb.activeId, askOnStart: viewersDb.askOnStart, list: viewersDb.list.map(pubViewer) });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const bt = {
     adapter: localStorage.getItem('mock:bt') !== 'none',
@@ -429,6 +434,42 @@ export function createMockApi() {
       return { started: true };
     },
     'system:reboot': () => setTimeout(() => location.reload(), 500),
+    // Household profiles (dev console: localStorage 'mock:viewers').
+    'viewers:list': () => viewersPublic(),
+    'viewers:activate': ({ id, pin }) => {
+      const v = viewersDb.list.find((x) => x.id === id);
+      if (v.pin && v.pin !== pin) throw new Error('Wrong PIN');
+      viewersDb.activeId = id;
+      if (v.theme) settings.theme = v.theme;
+      saveViewersDb();
+      return { viewer: pubViewer(v), settings: { ...settings } };
+    },
+    'viewers:save': ({ id, name, kids }) => {
+      let v = viewersDb.list.find((x) => x.id === id);
+      if (!v)
+        viewersDb.list.push(
+          (v = { id: Math.random().toString(16).slice(2, 10), colour: ['#0A5CFF', '#76B900', '#9146FF', '#FF5A00'][viewersDb.list.length % 4] })
+        );
+      Object.assign(v, { name: String(name || '').trim() || 'Profile', kids: !!kids });
+      saveViewersDb();
+      return pubViewer(v);
+    },
+    'viewers:pin': ({ id, pin }) => {
+      viewersDb.list.find((x) => x.id === id).pin = pin || '';
+      saveViewersDb();
+      return viewersPublic();
+    },
+    'viewers:remove': ({ id }) => {
+      viewersDb.list = viewersDb.list.filter((x) => x.id !== id);
+      if (viewersDb.activeId === id) viewersDb.activeId = 'main';
+      saveViewersDb();
+      return viewersPublic();
+    },
+    'viewers:askOnStart': ({ on }) => {
+      viewersDb.askOnStart = !!on;
+      saveViewersDb();
+      return viewersPublic();
+    },
     // Phone sign-in (dev console: mockPhoneLogin({ server, username, password })).
     'phonelogin:start': () => {
       window.mockPhoneLogin = (f) => emit('phonelogin:submit', { name: '', ...f });
@@ -568,8 +609,8 @@ export function createMockApi() {
       await wait(1500);
       return { hits: 8123, total: 10000 };
     },
-    'doc:get': ({ profileId, name }) => ls.get(`${profileId}:${name}`, {}),
-    'doc:set': ({ profileId, name, data }) => ls.set(`${profileId}:${name}`, data),
+    'doc:get': ({ profileId, name }) => ls.get(docKey(profileId, name), {}),
+    'doc:set': ({ profileId, name, data }) => ls.set(docKey(profileId, name), data),
     'trailer:get': async ({ item }) => {
       await wait(200);
       return settings.tmdbKey && settings.trailers !== false && item?.id % 3 !== 0 ? { available: true, name: 'Official Trailer' } : { available: false };

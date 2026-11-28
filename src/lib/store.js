@@ -6,7 +6,9 @@ import { useSyncExternalStore } from 'react';
 import { api } from './api.js';
 
 let state = {
-  boot: 'loading', // loading | login | catalog | ready
+  boot: 'loading', // loading | viewer (who's watching?) | login | catalog | ready
+  viewers: { activeId: 'main', askOnStart: true, list: [] },
+  viewer: null, // the household profile in use
   profiles: { activeId: null, list: [], secureStorage: true },
   profileId: null,
   account: null,
@@ -75,7 +77,7 @@ function indexSection(sec, sortFn) {
  * All channels, Search, Home rows, zapping lists) comes from here, so the adult filter
  * applies everywhere. The unfiltered copies are kept for saving and for "Shown".
  */
-function view(raw = state.catalogRaw, favs = state.favoritesAll, show = !!state.settings?.showAdult) {
+function view(raw = state.catalogRaw, favs = state.favoritesAll, show = !!state.settings?.showAdult && !state.viewer?.kids) {
   const f = filterAdult(raw, show);
   const all = { live: [], movie: [], series: [], ...(favs || {}) };
   return { catalogRaw: raw, favoritesAll: all, catalog: raw ? indexCatalog(f.raw) : null, favorites: filterFavs(all, f.hidden, show) };
@@ -106,13 +108,47 @@ export const confirmDialog = (opts) => new Promise((resolve) => setState({ confi
 
 // ---------- boot / profiles ----------
 export async function boot() {
-  const [profiles, settings] = await Promise.all([api.invoke('profiles:list'), api.invoke('settings:get')]);
+  const [profiles, settings, viewers] = await Promise.all([api.invoke('profiles:list'), api.invoke('settings:get'), api.invoke('viewers:list')]);
   applyTheme(settings.theme);
   applyScreenFit(settings.overscan);
-  setState({ profiles, settings });
+  setState({ profiles, settings, viewers, viewer: viewers.list.find((v) => v.id === viewers.activeId) || viewers.list[0] || null });
+  if (needsViewerPicker(viewers)) return setState({ boot: 'viewer' });
+  await openPlaylist();
+}
+
+/** "Who's watching?" at start: several profiles (unless turned off), or a locked one. */
+export function needsViewerPicker(vs) {
+  const active = vs.list.find((v) => v.id === vs.activeId);
+  return (vs.askOnStart && vs.list.length > 1) || !!active?.locked;
+}
+
+async function openPlaylist() {
+  const { profiles } = state;
   if (profiles.activeId && profiles.list.some((p) => p.id === profiles.activeId)) {
     await activateProfile(profiles.activeId);
   } else setState({ boot: 'login' });
+}
+
+export async function refreshViewers() {
+  const viewers = await api.invoke('viewers:list');
+  setState({ viewers, viewer: viewers.list.find((v) => v.id === viewers.activeId) || state.viewer });
+  return viewers;
+}
+
+/** Switch household profile (PIN when locked): their own favourites, progress and theme. */
+export async function chooseViewer(id, pin) {
+  const r = await api.invoke('viewers:activate', { id, pin });
+  applyTheme(r.settings.theme);
+  setState((s) => ({ settings: r.settings, viewer: r.viewer, viewers: { ...s.viewers, activeId: id } }));
+  toast(`Watching as ${r.viewer.name}`);
+  const pid = state.profileId;
+  if (pid && state.catalogRaw) {
+    const [favorites, progress] = await Promise.all([
+      api.invoke('doc:get', { profileId: pid, name: 'favorites' }),
+      api.invoke('doc:get', { profileId: pid, name: 'progress' }),
+    ]);
+    setState({ ...view(state.catalogRaw, favorites), progress: progress || {}, boot: 'ready', section: 'home', detail: null });
+  } else await openPlaylist();
 }
 
 export { applyTheme } from './theme.js';

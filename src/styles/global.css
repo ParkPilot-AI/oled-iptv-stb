@@ -2297,3 +2297,34 @@ small {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------- Who's watching? ---------- */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--avatar);
+  color: #fff;
+  font-weight: 700;
+  flex: none;
+}
+.viewer-tile small {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  min-height: 1.2rem;
+}
+.kids-badge {
+  padding: 0.05rem 0.55rem;
+  border-radius: 1rem;
+  background: #f5c518;
+  color: #000;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.profile-editor {
+  width: 44rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}

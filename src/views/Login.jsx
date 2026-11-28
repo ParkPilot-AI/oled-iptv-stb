@@ -54,7 +54,7 @@ export function Login() {
         />
       ) : (
         <>
-          <h2 className="login-sub">Who’s watching?</h2>
+          <h2 className="login-sub">Choose a playlist</h2>
           <div className="profile-grid" data-focus-group="profiles">
             {profiles.list.map((p, i) => (
               <div key={p.id} className="profile-tile-wrap">

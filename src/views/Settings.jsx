@@ -15,6 +15,7 @@ import {
 } from '../lib/store.js';
 import { clearArtCache } from '../lib/art.js';
 import { THEMES } from '../lib/theme.js';
+import { ProfileRows } from '../components/ProfileSettings.jsx';
 import { AdultRows } from '../components/AdultSettings.jsx';
 import { ControllerSettings } from '../components/ControllerSettings.jsx';
 import { Focusable } from '../components/Focusable.jsx';
@@ -332,6 +333,7 @@ const PICTURE_RESET = {
 
 export function Settings() {
   const settings = useStore((s) => s.settings);
+  const viewer = useStore((s) => s.viewer);
   const pid = useStore((s) => s.profileId);
   const epgStatus = useStore((s) => s.epgStatus);
   const catalog = useStore((s) => s.catalog);
@@ -381,7 +383,9 @@ export function Settings() {
           {C('Screensaver when paused', 'screensaverMin')}
           <Toggle label="Back keeps live TV playing in a corner" on={settings.pipOnBack !== false} onChange={(on) => update({ pipOnBack: on })} />
           <h2>Parental</h2>
-          <AdultRows settings={settings} />
+          {!viewer?.kids && <AdultRows settings={settings} />}
+          <h2>Profiles</h2>
+          <ProfileRows />
           <TextField
             label="Custom mpv path"
             value={settings.mpvPath}
