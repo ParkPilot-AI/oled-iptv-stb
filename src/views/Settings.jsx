@@ -8,6 +8,7 @@ import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
 import { UpdateRow } from '../components/SystemUpdate.jsx';
 import { NetworkRow } from '../components/NetworkSettings.jsx';
+import { ProvisionRow } from '../components/SystemUpdate.jsx';
 import { PillTabs, useTabCycle } from '../components/PillTabs.jsx';
 import { useKeyHandler } from '../nav/keys.js';
 import { focusFirst } from '../nav/spatial.js';
@@ -354,6 +355,7 @@ export function Settings() {
               <h2>Box</h2>
               <NetworkRow />
               <UpdateRow />
+              <ProvisionRow />
             </>
           )}
           <h2>Power</h2>

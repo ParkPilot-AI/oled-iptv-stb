@@ -15,6 +15,8 @@ const INVOKE = new Set([
   'adult:pin',
   'trailer:get',
   'trailer:play',
+  'system:provision:status',
+  'system:provision:run',
   'discover:recs',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',

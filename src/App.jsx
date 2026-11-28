@@ -1,7 +1,9 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff } from './lib/store.js';
 import { dispatchKey, dispatchKeyUp, setLongPressHandler, useBack, useKeyHandler, keyAction } from './nav/keys.js';
 import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
+import { JobModal, useProvision } from './components/SystemUpdate.jsx';
+import { api } from './lib/api.js';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';
 import { NavRail } from './components/NavRail.jsx';
 import { ConfirmHost, ToastHost, usePixelShift } from './components/Modal.jsx';
@@ -92,12 +94,32 @@ function MainApp() {
       {bootState === 'login' && <Login />}
       {bootState === 'catalog' && <CatalogLoading />}
       {bootState === 'ready' && <Shell />}
+      {bootState === 'ready' && <ProvisionPrompt />}
       <ConfirmHost />
       <ToastHost />
       <VolumeHud />
       {idle && <Screensaver />}
     </div>
   );
+}
+
+/**
+ * Boxes upgraded to 1.2 by the 1.1 updater are missing Bluetooth/Flatpak until
+ * 'stb-update provision' runs: ask once (it stays in Settings → System after that).
+ */
+function ProvisionPrompt() {
+  const settings = useStore((s) => s.settings);
+  const { st, refresh } = useProvision();
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (st?.needed && !settings?.provisionPrompted) {
+      setOpen(true);
+      api.invoke('settings:update', { provisionPrompted: true }).then((s) => setState({ settings: s }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st?.needed]);
+  if (!open) return null;
+  return <JobModal job="provision" onClose={() => setOpen(false)} onFinished={refresh} />;
 }
 
 function Splash({ text }) {

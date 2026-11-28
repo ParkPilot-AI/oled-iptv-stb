@@ -282,6 +282,22 @@ export function createMockApi() {
       return { started: true };
     },
     'system:reboot': () => setTimeout(() => location.reload(), 500),
+    // Provisioning (dev console: localStorage.setItem('mock:provision', 'needed'), reload).
+    'system:provision:status': () => ({ available: true, needed: localStorage.getItem('mock:provision') === 'needed', missing: ['bluez-utils', 'flatpak', 'bluetooth.service'] }),
+    'system:provision:run': () => {
+      const steps = [
+        [300, { type: 'step', text: 'Checking Bluetooth and Games support' }],
+        [900, { type: 'step', text: 'Installing 4 new package(s): bluez bluez-utils flatpak xdg-desktop-portal-gtk' }],
+        [1500, { type: 'line', text: '(1/4) installing bluez                       [####################] 100%' }],
+        [2200, { type: 'line', text: '(4/4) installing xdg-desktop-portal-gtk      [####################] 100%' }],
+        [2600, { type: 'step', text: 'Starting Bluetooth' }],
+        [3000, { type: 'done' }],
+        [3100, { type: 'exit', code: 0 }],
+      ];
+      setTimeout(() => localStorage.removeItem('mock:provision'), 3000);
+      for (const [ms, ev] of steps) setTimeout(() => emit('system:update:progress', ev), ms);
+      return { started: true };
+    },
     'art:get': (q) => (settings.tmdbKey ? { poster: null, backdrop: backdropArt(q.id), logo: titleLogo(q.name), overview: null } : null),
     'discover:lists': async ({ kind, names = ['trending', 'popular', 'top_rated', 'most_liked'] }) => {
       if (!settings.tmdbKey) return {};

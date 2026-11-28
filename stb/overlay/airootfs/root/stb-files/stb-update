@@ -2,6 +2,8 @@
 # ONYX set-top box updater (runs as root via a narrow sudoers rule).
 #   stb-update check   → one JSON line: pending system updates + app versions
 #   stb-update run     → update Arch packages, then the app; progress on stdout
+#   stb-update provision → install packages/services/config added since the box was
+#                      set up (Bluetooth, Games); quick no-op when nothing is missing
 #   stb-update reboot  → reboot the box
 #   stb-update wifi status|scan|connect <ssid>|forget <ssid>
 #                      → JSON; connect reads the passphrase from stdin
@@ -55,19 +57,62 @@ cmd_check() {
     '{system: $system, appInstalled: $installed, appLatest: $latest, repo: $repo, hasToken: $token}'
 }
 
-# Keep the box's own helpers in step with the app (shipped in the app package).
+# Keep the box's own helpers and config in step with the app (shipped in the app
+# package as stb-system/).
+KIOSK_USER=${STB_KIOSK_USER:-tv}
 install_system_files() {
   local src=$1
   [[ -d $src ]] || return 0
   local p="${STB_ROOT:-}" # test hook: install under a fake root
-  put() { # atomic replace, so a running copy of this script keeps working
-    [[ -f $1 ]] || return 0
-    cmp -s "$1" "$p$2" && return 0
+  # put <file> <dest> <mode>: atomic replace (a running copy of this script keeps
+  # working). Returns 0 only when the file changed.
+  put() {
+    [[ -f $1 ]] || return 1
+    cmp -s "$1" "$p$2" && return 1
     install -D -m "$3" "$1" "$p$2.new" && mv -f "$p$2.new" "$p$2"
   }
   put "$src/stb-update" /usr/local/sbin/stb-update 755
   put "$src/stb-audio.sh" /usr/local/bin/stb-audio 755
   put "$src/nm-stb.conf" /etc/NetworkManager/conf.d/stb.conf 644
+  put "$src/portals.conf" /etc/xdg-desktop-portal/portals.conf 644
+  if put "$src/bluetooth-main.conf" /etc/bluetooth/main.conf 644; then
+    # Only when the config changed (restarting drops connected controllers).
+    systemctl try-restart bluetooth.service >/dev/null 2>&1 || true
+  fi
+  local home; home=$(getent passwd "$KIOSK_USER" | cut -d: -f6); home=${home:-/home/$KIOSK_USER}
+  if put "$src/openbox-rc.xml" "$home/.config/openbox/rc.xml" 644; then
+    chown -R "$KIOSK_USER:$KIOSK_USER" "$p$home/.config/openbox" 2>/dev/null || true
+    runuser -u "$KIOSK_USER" -- env DISPLAY=:0 openbox --reconfigure >/dev/null 2>&1 || true
+  fi
+  return 0
+}
+
+# Packages listed in packages.txt (comments and blank lines stripped), one per line.
+list_packages() { [[ -f $1 ]] && sed 's/#.*//' "$1" | tr -s ' \t' '\n' | grep -v '^$'; }
+
+# Make sure every package, service and config file the current app needs is
+# present. sync=1: the package databases may be stale, so upgrade with the install
+# (never a partial upgrade). Quick no-op when nothing is missing.
+provision() {
+  local src=$1 sync=${2:-0}
+  local -a pkgs missing
+  mapfile -t pkgs < <(list_packages "$src/packages.txt")
+  if ((${#pkgs[@]})); then
+    mapfile -t missing < <(pacman -T "${pkgs[@]}" 2>/dev/null)
+    if ((${#missing[@]})); then
+      say "STEP Installing ${#missing[@]} new package(s): ${missing[*]}"
+      if ((sync)); then
+        pacman -Syu --needed --noconfirm "${pkgs[@]}" || fail "Installing packages failed — see $LOG"
+      else
+        pacman -S --needed --noconfirm "${pkgs[@]}" || fail "Installing packages failed — see $LOG"
+      fi
+    fi
+  fi
+  install_system_files "$src"
+  if ! systemctl is-enabled bluetooth.service >/dev/null 2>&1 || ! systemctl is-active bluetooth.service >/dev/null 2>&1; then
+    say "STEP Starting Bluetooth"
+    systemctl enable --now bluetooth.service >/dev/null 2>&1 || true
+  fi
 }
 
 update_app() {
@@ -121,10 +166,25 @@ cmd_run() {
 
   update_app
 
+  # pacman -Su only upgrades what's installed: add packages/services/config the app
+  # needs now (e.g. Bluetooth, Flatpak). Uses the list from the app just installed.
+  say "STEP Checking Bluetooth and Games support"
+  provision "$APP/stb-system" 0
+
   # The running kernel's modules are removed when a new kernel is installed.
   if [[ ! -d /usr/lib/modules/$(uname -r) ]]; then
     say "REBOOT_REQUIRED"
   fi
+  say "DONE"
+}
+
+cmd_provision() {
+  exec 9>"$LOCK"
+  flock -n 9 || fail "An update is already running"
+  exec > >(tee -a "$LOG") 2>&1
+  echo "=== $(date -Is) provision started ==="
+  say "STEP Checking Bluetooth and Games support"
+  provision "$APP/stb-system" 1
   say "DONE"
 }
 
@@ -199,8 +259,9 @@ cmd_wifi() {
 case ${1:-} in
   wifi) shift; cmd_wifi "$@" ;;
   check) cmd_check ;;
+  provision) cmd_provision ;;
   run) cmd_run ;;
   reboot) systemctl reboot ;;
   poweroff) systemctl poweroff ;;
-  *) echo "usage: stb-update check|run|reboot|poweroff|wifi ..." >&2; exit 2 ;;
+  *) echo "usage: stb-update check|run|provision|reboot|poweroff|wifi ..." >&2; exit 2 ;;
 esac

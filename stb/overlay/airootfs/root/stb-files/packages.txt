@@ -28,3 +28,13 @@ noto-fonts ttf-dejavu
 
 # One-button updater
 pacman-contrib jq curl
+
+# Bluetooth + game controllers (Settings → Controllers) and Games (GeForce NOW).
+# Drivers come from the mainline kernel: Xbox One/Series pads over Bluetooth use
+# hid-microsoft/hid-generic, over USB xpad. Adapter firmware for Intel, Realtek,
+# MediaTek and Atheros is already in the linux-firmware-* packages above.
+bluez bluez-utils flatpak
+# flatpak pulls in xdg-desktop-portal, which needs a backend: without one, Flatpak
+# apps (GeForce NOW) stall on start-up waiting for portal calls in this openbox
+# session. The GTK backend works without a full desktop (selected in portals.conf).
+xdg-desktop-portal-gtk

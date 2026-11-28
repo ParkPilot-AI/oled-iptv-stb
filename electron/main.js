@@ -135,10 +135,14 @@ function checkUpdates() {
   });
 }
 
-function runUpdate() {
-  if (!hasUpdater()) throw new Error('Updates are only available on the set-top box image');
+/**
+ * Run a long stb-update subcommand (run, provision, games install …), streaming its
+ * '@@' progress lines to the renderer as 'system:update:progress'. One at a time.
+ */
+function runHelper(args) {
+  if (!hasUpdater()) throw new Error('Only available on the set-top box image');
   if (updateProc) return { started: false, running: true };
-  const p = spawn('sudo', ['-n', UPDATER, 'run'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const p = spawn('sudo', ['-n', UPDATER, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
   updateProc = p;
   let buf = '';
   const emit = (ev) => sendMain('system:update:progress', ev);
@@ -166,6 +170,23 @@ function runUpdate() {
     emit({ type: 'exit', code });
   });
   return { started: true };
+}
+
+/**
+ * Boxes upgraded by an older updater may lack what 1.2 added (BlueZ, Flatpak, the
+ * bluetooth service). Checked without root: binaries present + service enabled.
+ */
+function provisionStatus() {
+  if (!hasUpdater()) return Promise.resolve({ available: false, needed: false });
+  const missing = [];
+  if (!fs.existsSync('/usr/bin/bluetoothctl')) missing.push('bluez-utils');
+  if (!fs.existsSync('/usr/bin/flatpak')) missing.push('flatpak');
+  return new Promise((resolve) =>
+    execFile('systemctl', ['is-enabled', 'bluetooth.service'], { timeout: 5000 }, (err, out) => {
+      if (err || String(out).trim() !== 'enabled') missing.push('bluetooth.service');
+      resolve({ available: true, needed: missing.length > 0, missing });
+    })
+  );
 }
 
 /** Run the root helper with args (and optional stdin), parse its last JSON line. */
@@ -289,7 +310,9 @@ const handlers = {
   'net:scan': () => helperJson(['wifi', 'scan']),
   'net:connect': ({ ssid, password }) => helperJson(['wifi', 'connect', String(ssid)], `${password || ''}\n`),
   'net:forget': ({ ssid }) => helperJson(['wifi', 'forget', String(ssid)]),
-  'system:update:run': () => runUpdate(),
+  'system:update:run': () => runHelper(['run']),
+  'system:provision:status': () => provisionStatus(),
+  'system:provision:run': () => runHelper(['provision']),
   'system:reboot': () => {
     if (!hasUpdater()) throw new Error('Not available on this system');
     store.flushDocs();

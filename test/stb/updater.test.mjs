@@ -17,10 +17,28 @@ function setup({ latest = '2026.11.27-new', corrupt = false, withApp = true } = 
   const bin = path.join(dir, 'bin');
   fs.mkdirSync(bin);
   const fake = (name, body) => fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
-  fake('pacman', `echo "pacman $*" >> "${dir}/calls"`);
+  // pacman: -T lists packages not in $dir/installed; -S adds them; everything is logged.
+  fs.writeFileSync(path.join(dir, 'installed'), 'base\nlinux\nmpv\n');
+  fake(
+    'pacman',
+    `echo "pacman $*" >> "${dir}/calls"
+case "$1" in
+  -T) shift; miss=0; for p in "$@"; do grep -qx "$p" "${dir}/installed" || { echo "$p"; miss=1; }; done; [ $miss = 0 ] || exit 127 ;;
+  -S*) for p in "$@"; do case "$p" in -*) ;; *) echo "$p" >> "${dir}/installed" ;; esac; done ;;
+esac`
+  );
   fake('checkupdates', `printf 'linux 6.1 -> 6.2\\nmpv 0.38 -> 0.39\\nmesa 1 -> 2\\n'`);
   fake('paccache', 'true');
-  fake('systemctl', `echo "systemctl $*" >> "${dir}/calls"`);
+  // systemctl: bluetooth is enabled/active once 'enable --now' ran.
+  fake(
+    'systemctl',
+    `echo "systemctl $*" >> "${dir}/calls"
+case "$1" in
+  is-enabled|is-active) [ -f "${dir}/bt-on" ] ;;
+  enable) touch "${dir}/bt-on" ;;
+esac`
+  );
+  fake('runuser', `echo "runuser $*" >> "${dir}/calls"`);
   fake('sudo', 'exec "$@"');
 
   // Installed app + new build tarball
@@ -36,6 +54,10 @@ function setup({ latest = '2026.11.27-new', corrupt = false, withApp = true } = 
   fs.mkdirSync(path.join(build, 'stb-system'));
   fs.writeFileSync(path.join(build, 'stb-system', 'stb-update'), '#!/bin/bash\n# new helper\n');
   fs.writeFileSync(path.join(build, 'stb-system', 'nm-stb.conf'), '[device]\n');
+  fs.writeFileSync(path.join(build, 'stb-system', 'packages.txt'), '# Base\nbase linux   mpv\n\n# Bluetooth + game controllers\nbluez bluez-utils flatpak # comment after\nxdg-desktop-portal-gtk\n');
+  fs.writeFileSync(path.join(build, 'stb-system', 'bluetooth-main.conf'), '[General]\nControllerMode = dual\n');
+  fs.writeFileSync(path.join(build, 'stb-system', 'portals.conf'), '[preferred]\ndefault=gtk\n');
+  fs.writeFileSync(path.join(build, 'stb-system', 'openbox-rc.xml'), '<openbox_config/>\n');
   const tarball = path.join(dir, 'app.tar.zst');
   execFileSync('tar', ['-C', build, '-I', 'zstd', '-cf', tarball, '.']);
   const tarBuf = fs.readFileSync(tarball);
@@ -135,4 +157,49 @@ test('already up to date → no swap', { skip }, async () => {
   assert.equal(r.status, 0);
   assert.match(r.stdout, /@@ STEP App is up to date/);
   assert.ok(!fs.existsSync(ctx.app + '.old'));
+});
+
+test('run installs packages added since the box was set up, enables Bluetooth, installs config', { skip }, async () => {
+  const ctx = await setup();
+  const r = await run(ctx, 'run');
+  ctx.close();
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const calls = fs.readFileSync(path.join(ctx.dir, 'calls'), 'utf8');
+  // packages.txt parsed: comments, blank lines and trailing comments stripped
+  assert.match(calls, /pacman -T base linux mpv bluez bluez-utils flatpak xdg-desktop-portal-gtk\n/);
+  assert.match(calls, /pacman -S --needed --noconfirm base linux mpv bluez bluez-utils flatpak xdg-desktop-portal-gtk\n/);
+  assert.match(r.stdout, /@@ STEP Installing 4 new package\(s\): bluez bluez-utils flatpak xdg-desktop-portal-gtk/);
+  assert.match(calls, /systemctl enable --now bluetooth.service/);
+  assert.match(calls, /systemctl try-restart bluetooth.service/, 'BlueZ restarted because its config changed');
+  assert.match(fs.readFileSync(path.join(ctx.dir, 'root/etc/bluetooth/main.conf'), 'utf8'), /ControllerMode = dual/);
+  assert.ok(fs.existsSync(path.join(ctx.dir, 'root/etc/xdg-desktop-portal/portals.conf')));
+  assert.ok(fs.existsSync(path.join(ctx.dir, 'root/home/tv/.config/openbox/rc.xml')));
+  assert.match(calls, /runuser -u tv -- env DISPLAY=:0 openbox --reconfigure/);
+});
+
+test('provision is idempotent: a second run installs nothing and restarts nothing', { skip }, async () => {
+  const ctx = await setup();
+  // Put the new app (with stb-system) in place first, as the first update would.
+  await run(ctx, 'run');
+  fs.writeFileSync(path.join(ctx.dir, 'calls'), '');
+  const r = await run(ctx, 'provision');
+  ctx.close();
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const calls = fs.readFileSync(path.join(ctx.dir, 'calls'), 'utf8');
+  assert.match(calls, /pacman -T /);
+  assert.doesNotMatch(calls, /pacman -S/, 'nothing missing → no install');
+  assert.doesNotMatch(calls, /try-restart|enable --now|runuser/, 'nothing changed → nothing restarted');
+  assert.equal(r.stdout.split('\n').filter((l) => l.startsWith('@@ ')).at(-1), '@@ DONE');
+});
+
+test('provision on a box upgraded by the old updater: syncs and installs what is missing', { skip }, async () => {
+  const ctx = await setup();
+  // Simulate the 1.1.0 updater: new app unpacked, but no provisioning done.
+  execFileSync('tar', ['-C', ctx.app, '-I', 'zstd', '-xf', path.join(ctx.dir, 'app.tar.zst')]);
+  const r = await run(ctx, 'provision');
+  ctx.close();
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const calls = fs.readFileSync(path.join(ctx.dir, 'calls'), 'utf8');
+  assert.match(calls, /pacman -Syu --needed --noconfirm base linux mpv bluez/, 'never a partial upgrade');
+  assert.match(calls, /systemctl enable --now bluetooth.service/);
 });
