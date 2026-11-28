@@ -5,6 +5,8 @@ import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
 import { JobModal, useProvision } from './components/SystemUpdate.jsx';
 import { startControllerWatch, btJustConnected } from './lib/controllers.js';
 import { startGamepadNav, padName } from './lib/gamepad.js';
+import { noteInput, configureFeedback } from './lib/feedback.js';
+import { HintBar } from './components/HintBar.jsx';
 import { api } from './lib/api.js';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';
 import { NavRail } from './components/NavRail.jsx';
@@ -40,6 +42,8 @@ const UI_SCREENSAVER_MS = 10 * 60 * 1000;
 function MainApp() {
   const bootState = useStore((s) => s.boot);
   const rootRef = useRef(null);
+  const fbSettings = useStore((s) => s.settings);
+  useEffect(() => configureFeedback(fbSettings || {}), [fbSettings]);
   // While GeForce NOW has the screen, ONYX is hidden: no screensaver or pixel shift.
   const gamesRunning = useStore((s) => s.gamesRunning);
   const [idle, setIdle] = useIdle(UI_SCREENSAVER_MS, !gamesRunning);
@@ -79,6 +83,7 @@ function MainApp() {
 
   useEffect(() => {
     const onKey = (e) => {
+      noteInput(e);
       const act = keyAction(e);
       if (act === 'volUp' || act === 'volDown' || act === 'mute') {
         e.preventDefault();
@@ -129,6 +134,7 @@ function MainApp() {
       {bootState === 'ready' && <ControllerWatch />}
       <ConfirmHost />
       <ToastHost />
+      {bootState === 'ready' && <HintBar />}
       <VolumeHud />
       {idle && <Screensaver />}
     </div>

@@ -174,7 +174,7 @@ node test/e2e/mock-xtream.mjs     # 300 channels + EPG + 1 movie + 1 series
 | 0–9 | — | Jump to a channel number (Live) |
 | A / S | — | Next audio track / subtitle track, named on screen ("Audio: English · AC3 5.1 (2/3)", "Subtitles: Off") |
 | Volume Up / Down / Mute | Box volume | Box volume |
-| Game controller (USB or Bluetooth) | D-pad / left stick move, A = OK (hold = Favourites), B = Back, LB / RB = previous / next tab | Same as the remote; X = play/pause, Y = favourite, Menu = info |
+| Game controller (USB or Bluetooth) | D-pad / left stick move, A = OK (hold = Favourites), B = Back, LB / RB = previous / next tab | Same as the remote; X = play/pause, Y = info (trailer preview on a poster), Menu = favourite |
 | Ctrl+Alt+Home / Home (XF86HomePage) | — | While GeForce NOW is open: close it and return to ONYX (box only) |
 
 **Trailers:** film and series pages have a **Trailer** button when TMDB lists one. It plays full screen in mpv straight from YouTube's video servers through yt-dlp — no YouTube page, no ads — and Back (or the end) returns to the page. Needs a TMDB key and yt-dlp; Settings → Library → Trailers turns it off.

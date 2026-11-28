@@ -396,6 +396,9 @@ export function Settings() {
           <Action label="Toggle fullscreen now" onSelect={() => api.invoke('app:toggleFullscreen')} />
           <h2>Menu</h2>
           <Toggle label="Show Games in sidebar" on={!!settings.showGames} onChange={(on) => update({ showGames: on })} />
+          <Toggle label="Button hints" on={settings.showHints !== false} onChange={(on) => update({ showHints: on })} />
+          <Toggle label="Navigation sounds" on={settings.uiSounds !== false} onChange={(on) => update({ uiSounds: on })} />
+          <Toggle label="Controller rumble" on={settings.rumble !== false} onChange={(on) => update({ rumble: on })} />
         </div>
       </>
     ),

@@ -3,6 +3,7 @@ import { pushScope, focusFirst } from '../nav/spatial.js';
 import { useBack } from '../nav/keys.js';
 import { Focusable } from './Focusable.jsx';
 import { useStore, setState } from '../lib/store.js';
+import { feedback } from '../lib/feedback.js';
 
 /** Focus-trapping overlay. Back closes it; focus returns to the opener. */
 export function Modal({ onClose, children, className = '', priority = 100 }) {
@@ -10,6 +11,7 @@ export function Modal({ onClose, children, className = '', priority = 100 }) {
   useLayoutEffect(() => {
     const pop = pushScope(ref.current);
     focusFirst(ref.current);
+    feedback('open');
     return pop;
   }, []);
   useBack(() => (onClose?.(), true), { priority });
