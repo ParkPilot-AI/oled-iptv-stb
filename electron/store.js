@@ -134,7 +134,7 @@ export const DEFAULT_SETTINGS = {
   osdTimeoutSec: 4,
   screensaverMin: 3,
   startFullscreen: true,
-  theme: 'amber', // amber | cyan | crimson | violet | mono
+  theme: 'amber', // amber | cyan | crimson | violet | mono | bold: red | green | blue | purple | orange
   trailers: true, // Trailer button on film/series pages (needs a TMDB key and yt-dlp)
   ytdlpPath: '', // custom yt-dlp binary; empty = bundled, then PATH
   showGames: false, // 'Games' (GeForce NOW) in the side menu
