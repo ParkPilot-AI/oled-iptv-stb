@@ -29,8 +29,11 @@ export function useArtSettings() {
 export function useArt(item, enabled = true) {
   const mode = useArtSettings();
   const t = target(item);
-  const key = t ? `${t.kind}:${t.id}` : null;
-  const [art, setArt] = useState(() => (key ? cache.get(key) ?? null : null));
+  const key = t ? `${t.kind}:${t.id}:${t.tmdbId || ''}` : null;
+  // State remembers which title it belongs to, so a slow lookup can never show
+  // the previous title's artwork under the next title's name.
+  const [state, setState] = useState(() => ({ key, art: key ? cache.get(key) ?? null : null }));
+  const setArt = (a) => setState({ key, art: a });
   useEffect(() => {
     if (mode === 'off' || !key || !enabled) return;
     if (cache.has(key)) {
@@ -50,13 +53,15 @@ export function useArt(item, enabled = true) {
       pending.set(key, p);
     }
     let alive = true;
-    p.then((a) => alive && setArt(a));
+    const k = key;
+    p.then((a) => alive && setState({ key: k, art: a }));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, mode, enabled, t?.tmdbId]);
-  return mode === 'off' ? null : art;
+  if (mode === 'off' || !key) return null;
+  return state.key === key ? state.art : cache.get(key) ?? null;
 }
 
 /** Ordered image candidates (provider vs TMDB); the next is used if one fails to load. */

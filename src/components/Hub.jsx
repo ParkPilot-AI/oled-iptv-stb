@@ -12,6 +12,7 @@ import { Focusable } from './Focusable.jsx';
 import { Icon } from './Icons.jsx';
 import { useKeyHandler } from '../nav/keys.js';
 import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
+import { rejectMatch } from '../lib/discover.js';
 import { clock, pad, humanDuration, progressPct } from '../lib/format.js';
 
 const SLIDE_MS = 8000;
@@ -169,27 +170,28 @@ export function Hub({ rows, slides, tabs, rowsKey, empty, className = '' }) {
 const infoCache = new Map();
 function useDetails(hero) {
   const pid = useStore((s) => s.profileId);
-  const [info, setInfo] = useState(null);
   const it = hero?.item;
   const key = it && (it.kind === 'movie' || it.kind === 'series') ? `${it.kind}:${it.id}` : null;
+  const [state, setState] = useState({ key: null, info: null });
+  const setInfo = (info, k = key) => setState({ key: k, info });
   useEffect(() => {
     if (!key) return setInfo(null);
     if (infoCache.has(key)) return setInfo(infoCache.get(key));
-    setInfo(null);
     const t = setTimeout(() => {
       api
         .invoke(it.kind === 'movie' ? 'vod:info' : 'series:info', { profileId: pid, item: { id: it.id, name: it.name, icon: it.icon, ext: it.ext } })
         .then((r) => {
           const slim = { backdrop: r.backdrop, plot: r.plot, year: r.year, genre: r.genre, duration: r.duration, rating: r.rating, seasons: r.seasons?.length, tmdbId: r.tmdbId };
           infoCache.set(key, slim);
-          setInfo(slim);
+          setInfo(slim, key);
         })
         .catch(() => infoCache.set(key, {}));
     }, 350);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, pid]);
-  return info;
+  if (!key) return null;
+  return state.key === key ? state.info : infoCache.get(key) ?? null;
 }
 
 /** Crossfading backdrop: the new image fades in over the old once it has loaded. */
@@ -222,11 +224,18 @@ function Backdrop({ src, poster }) {
 function Spotlight({ hero, carousel }) {
   const info = useDetails(hero);
   const mode = useArtSettings();
-  const it0 = hero?.item;
-  // Wait for provider details (may carry a TMDB id) before asking TMDB.
-  const art = useArt(it0 && info?.tmdbId ? { ...it0, tmdbId: info.tmdbId } : it0, !!hero && hero.kind !== 'live');
+  const raw = hero?.item;
+  // A discovery title matched by name may be a different film with the same name:
+  // the provider's own TMDB id settles it. On a mismatch, show only the provider's data.
+  const mismatch = !!(raw?.tmdb && info?.tmdbId && Number(info.tmdbId) !== Number(raw.tmdbId));
+  useEffect(() => {
+    if (mismatch) rejectMatch(raw);
+  }, [mismatch, raw]);
+  const it0 = raw && mismatch ? { ...raw, tmdb: undefined, tmdbId: info.tmdbId } : raw;
+  const tid = info?.tmdbId || it0?.tmdbId;
+  const art = useArt(it0 ? { ...it0, tmdbId: tid } : it0, !!hero && hero.kind !== 'live');
   if (!hero) return <section className="spotlight" />;
-  const it = hero.item;
+  const it = it0;
   const live = hero.kind === 'live';
   const wide = chooseArt(mode, info?.backdrop || (hero.kind === 'episode' ? it.icon : ''), art?.backdrop || it.tmdb?.backdrop);
   const backdrop = live ? '' : wide || it.icon || it.seriesIcon || '';

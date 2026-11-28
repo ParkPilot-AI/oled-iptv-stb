@@ -39,6 +39,27 @@ export function buildMatcher(items) {
 
 const QUALITY = /\b(4k|uhd|2160p)\b/i;
 
+// Name matches the provider's details proved wrong (a same-named, different title).
+const rejected = new Set();
+const listeners = new Set();
+const rkey = (itemId, tmdbId) => `${itemId}:${tmdbId}`;
+export function rejectMatch(item) {
+  if (!item?.tmdbId) return;
+  const k = rkey(item.id, item.tmdbId);
+  if (rejected.has(k)) return;
+  rejected.add(k);
+  listeners.forEach((f) => f());
+}
+function useRejections() {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    const f = () => setV((x) => x + 1);
+    listeners.add(f);
+    return () => listeners.delete(f);
+  }, []);
+  return v;
+}
+
 /** TMDB results → provider items (with tmdbId and TMDB art attached), in TMDB order. */
 export function matchList(results, matcher, { limit = 30, exclude } = {}) {
   if (!results?.length || !matcher) return [];
@@ -47,8 +68,12 @@ export function matchList(results, matcher, { limit = 30, exclude } = {}) {
   for (const r of results) {
     let it = matcher.byTmdb.get(r.id);
     if (!it) {
-      const cands = [...(matcher.byTitle.get(norm(r.title)) || []), ...(r.original && r.original !== r.title ? matcher.byTitle.get(norm(r.original)) || [] : [])];
-      const ok = cands.filter((c) => !c.year || !r.year || Math.abs(Number(c.year) - Number(r.year)) <= 1);
+      const cands = [...(matcher.byTitle.get(norm(r.title)) || []), ...(r.original && r.original !== r.title ? matcher.byTitle.get(norm(r.original)) || [] : [])].filter(
+        (c) => !rejected.has(rkey(c.it.id, r.id)) && (!c.it.tmdbId || Number(c.it.tmdbId) === r.id) // provider says it's another title
+      );
+      // Years must agree when both are known; a yearless title only matches if it's the only one by that name.
+      const dated = cands.filter((c) => c.year && r.year && Math.abs(Number(c.year) - Number(r.year)) <= 1);
+      const ok = dated.length ? dated : cands.length && cands.every((c) => !c.year) ? cands : [];
       // Same film listed in several qualities/languages: prefer a plain HD copy.
       it = (ok.find((c) => !QUALITY.test(c.it.name)) || ok[0])?.it;
     }
@@ -90,12 +115,14 @@ export function useDiscover(kind, names = BASE) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig, hasKey]);
   const matcher = useMemo(() => (raw ? matcherFor(section) : null), [raw, section]);
+  const rv = useRejections();
   return useMemo(() => {
     if (!raw || !matcher) return {};
     const out = {};
     for (const [name, results] of Object.entries(raw)) out[name] = matchList(results, matcher);
     return out;
-  }, [raw, matcher]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raw, matcher, rv]);
 }
 
 const recsCache = new Map();

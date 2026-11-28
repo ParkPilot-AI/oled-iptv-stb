@@ -30,3 +30,23 @@ test('exclude and limit', () => {
   const r = matchList([{ id: 603, title: 'The Matrix', year: '1999' }, { id: 624860, title: 'The Matrix Resurrections', year: '2021' }], m, { exclude: new Set([1]), limit: 5 });
   assert.deepEqual(r.map((x) => x.id), [3]);
 });
+
+test('never pairs a TMDB title with a different same-named film', async () => {
+  const { buildMatcher: bm, matchList: ml, rejectMatch } = await import('../src/lib/discover.js');
+  const cat = [
+    { kind: 'movie', id: 10, name: 'Dune', tmdbId: 841 }, // provider says: the 1984 film
+    { kind: 'movie', id: 11, name: 'Total Recall (1990)' },
+    { kind: 'movie', id: 12, name: 'Total Recall' },
+    { kind: 'movie', id: 13, name: 'Heat' },
+  ];
+  const m2 = bm(cat);
+  // TMDB "Dune" (2021) must not take the provider's 1984 copy.
+  assert.deepEqual(ml([{ id: 438631, title: 'Dune', year: '2021' }], m2), []);
+  // One dated + one undated copy: only the dated one can be trusted.
+  assert.deepEqual(ml([{ id: 64635, title: 'Total Recall', year: '2012' }], m2), []);
+  assert.deepEqual(ml([{ id: 861, title: 'Total Recall', year: '1990' }], m2).map((x) => x.id), [11]);
+  // Undated single copy matches, until the provider's details prove otherwise.
+  assert.deepEqual(ml([{ id: 949, title: 'Heat', year: '1995' }], m2).map((x) => x.id), [13]);
+  rejectMatch({ id: 13, tmdbId: 949 });
+  assert.deepEqual(ml([{ id: 949, title: 'Heat', year: '1995' }], m2), []);
+});
