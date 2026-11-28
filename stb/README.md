@@ -89,6 +89,8 @@ Plug the dongle in **before** booting the installer. Scans can take up to 20 s.
 
 **Existing boxes.** `stb-update run` provisions automatically, *but* the update that brings 1.2.0 is performed by the old helper, which doesn't know how. So after that first update ONYX asks once — and **Settings → System** shows **Finish installing the update** until it's done — which runs `stb-update provision` (a full `pacman -Syu --needed` with the new packages). Later updates need nothing extra.
 
+**Sign-in:** the box has no web browser, so `/usr/local/bin/onyx-open-url` is registered as the default for http/https links (`~/.local/share/applications/onyx-browser.desktop`, `~/.config/mimeapps.list`). It drops the address in `$XDG_RUNTIME_DIR/onyx-open-url/`, and ONYX shows it in a full-screen, sandboxed window that closes itself when the page returns to `localhost`.
+
 GeForce NOW runs under openbox as a normal X11 window (WM_CLASS `GeForceNOW`), forced full screen and undecorated. Openbox binds **Ctrl+Alt+Home** and **XF86HomePage** to `flatpak kill com.nvidia.geforcenow` as an emergency exit; ONYX comes back on its own. It needs working Vulkan Video H.264/H.265 decoding from Mesa on Intel/AMD graphics.
 
 **Optional follow-ups, not included:** `xpadneo` (better Xbox One/Series Bluetooth support: rumble, battery, button maps) is a DKMS module, so it isn't installed — the stock driver is enough for GeForce NOW. The Xbox Wireless USB dongle (`xone`) is out of scope; use Bluetooth or a USB cable.

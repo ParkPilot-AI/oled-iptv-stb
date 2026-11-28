@@ -78,7 +78,10 @@ export function Games() {
         </div>
         <div>
           <h3>Account</h3>
-          <p>Sign in with your NVIDIA account the first time. A free or paid membership is needed.</p>
+          <p>
+            The first time, choose Log in in GeForce NOW: NVIDIA’s sign-in page opens full screen (a USB keyboard makes typing easier) and closes by itself when
+            you’re done. Esc closes it.
+          </p>
         </div>
         <div>
           <h3>Network</h3>

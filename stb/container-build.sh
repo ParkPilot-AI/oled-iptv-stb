@@ -21,7 +21,7 @@ echo "$BUILD_ID" > release/linux-unpacked/stb-version.txt
 # Box helpers travel with the app so "Update system" keeps them current too.
 mkdir -p release/linux-unpacked/stb-system
 # packages.txt lets 'stb-update run/provision' install packages added since the box was set up.
-cp /kit/overlay/airootfs/root/stb-files/{stb-update,stb-audio.sh,nm-stb.conf,packages.txt,bluetooth-main.conf,portals.conf,openbox-rc.xml} release/linux-unpacked/stb-system/
+cp /kit/overlay/airootfs/root/stb-files/{stb-update,stb-audio.sh,nm-stb.conf,packages.txt,bluetooth-main.conf,portals.conf,openbox-rc.xml,onyx-open-url,onyx-browser.desktop,mimeapps.list} release/linux-unpacked/stb-system/
 # Tarball keeps executable bits/setuid layout (archiso resets modes of airootfs files).
 mkdir -p /build/payload
 tar -C release/linux-unpacked -I 'zstd -19 -T0' -cf /build/payload/oled-iptv.tar.zst .

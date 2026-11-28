@@ -1,0 +1,5 @@
+# Web links on the box open in ONYX's sign-in window (onyx-browser.desktop).
+[Default Applications]
+x-scheme-handler/http=onyx-browser.desktop
+x-scheme-handler/https=onyx-browser.desktop
+text/html=onyx-browser.desktop

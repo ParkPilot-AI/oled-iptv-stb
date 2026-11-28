@@ -326,6 +326,10 @@ install -Dm755 "$FILES/openbox-autostart" "$H/.config/openbox/autostart"
 install -Dm644 "$FILES/openbox-rc.xml" "$H/.config/openbox/rc.xml"
 install -Dm644 "$FILES/picom.conf" "$H/.config/picom/picom.conf"
 install -Dm755 "$FILES/stb-audio.sh" "$MNT/usr/local/bin/stb-audio"
+# Web links (GeForce NOW sign-in) open in ONYX: the box has no web browser.
+install -Dm755 "$FILES/onyx-open-url" "$MNT/usr/local/bin/onyx-open-url"
+install -Dm644 "$FILES/onyx-browser.desktop" "$H/.local/share/applications/onyx-browser.desktop"
+install -Dm644 "$FILES/mimeapps.list" "$H/.config/mimeapps.list"
 
 # One-button updater: root helper, a sudo rule that allows only it, and its config.
 install -Dm755 -o root -g root "$FILES/stb-update" "$MNT/usr/local/sbin/stb-update"

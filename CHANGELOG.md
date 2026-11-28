@@ -11,6 +11,9 @@
   under *Connected now*, the Games page shows it, and plugging one in shows a toast.
 
 ### Fixed
+- **GeForce NOW sign-in on the box.** GeForce NOW signs in through the web browser, and the
+  box has none, so *Log in* did nothing. Web links now open in a full-screen ONYX sign-in
+  window that closes by itself once you're signed in (Esc closes it any time).
 - "Finish installing the update" on a box whose updater is too old now says how to fix it
   instead of "Updater exited with code 2".
 
