@@ -224,6 +224,9 @@ export default function OsdApp() {
           else if (visible) {
             clearTimeout(hideT.current);
             setVisible(false);
+          } else if (s.pipOnBack && (live || s.kind === 'trailer')) {
+            // Keep watching in a corner while browsing (mini-player).
+            cmd({ type: 'dock' });
           } else cmd({ type: 'stop' });
           break;
         case 'stop':

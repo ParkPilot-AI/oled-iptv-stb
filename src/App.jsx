@@ -134,6 +134,7 @@ function MainApp() {
       {bootState === 'ready' && <ControllerWatch />}
       <ConfirmHost />
       <ToastHost />
+      {bootState === 'ready' && <DockCaption />}
       {bootState === 'ready' && <HintBar />}
       <VolumeHud />
       {idle && <Screensaver />}
@@ -199,6 +200,20 @@ function CatalogLoading() {
   );
 }
 
+/** Caption above the mini-player (the video itself is mpv's window, floating above). */
+function DockCaption() {
+  const d = useStore((s) => s.docked);
+  if (!d || d.mode !== 'dock') return null;
+  const it = d.item || {};
+  return (
+    <div className="dock-caption">
+      <span className="live-dot" />
+      {it.num ? `${it.num} · ` : ''}
+      {it.name || 'Now playing'}
+    </div>
+  );
+}
+
 function Shell() {
   const section = useStore((s) => s.section);
   const detail = useStore((s) => s.detail);
@@ -208,12 +223,35 @@ function Shell() {
     requestAnimationFrame(() => focusFirst(contentRef.current));
   }, []);
 
-  // Base back behaviour: content → rail → exit confirmation.
+  // Mini-player / trailer preview: Play/Pause (X on a controller) goes back to
+  // full screen, Stop closes it.
+  useKeyHandler(
+    (action) => {
+      const d = getState().docked;
+      if (!d) return false;
+      if (action === 'playPause') {
+        api.invoke('player:command', { type: d.mode === 'peek' ? 'stop' : 'undock' }).catch(() => {});
+        return true;
+      }
+      if (action === 'stop') {
+        api.invoke('player:command', { type: 'stop' }).catch(() => {});
+        return true;
+      }
+      return false;
+    },
+    { priority: 40 }
+  );
+
+  // Base back behaviour: content → rail → (close the mini-player) → exit confirmation.
   useBack(
     () => {
       const inRail = document.activeElement?.closest('.rail');
       if (!inRail) {
         focusByKey(`rail-${getState().section}`) || focusGroup('rail');
+        return true;
+      }
+      if (getState().docked) {
+        api.invoke('player:command', { type: 'stop' }).catch(() => {});
         return true;
       }
       powerOff();

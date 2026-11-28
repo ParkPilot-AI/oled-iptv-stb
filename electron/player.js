@@ -34,6 +34,7 @@ export class Player {
     this.lastProgressSave = 0;
     this.retries = 0;
     this.starting = null;
+    this.windowMode = 'full'; // 'full' | 'dock' (mini-player) | 'peek' (trailer preview)
   }
 
   get active() {
@@ -116,8 +117,14 @@ export class Player {
   }
 
   /** Start a session. items: [{kind,id,name,ext,...}], index: start position. */
-  async play({ profileId, items, index = 0, resume = true }) {
+  async play({ profileId, items, index = 0, resume = true, mode = 'full' }) {
     if (!items?.length) throw new Error('Nothing to play');
+    // One stream at a time (most providers allow 1–2 connections): whatever is
+    // playing — full screen, mini-player or preview — is replaced, never doubled.
+    if (this.session) {
+      this._saveProgress();
+      this.ui.onClosed({ reason: 'replaced', profileId: this.session.profileId, item: this.state?.item, index: this.session.index });
+    }
     const creds = items.every((it) => it.kind === 'trailer') ? null : await getCredentials(profileId);
     const settings = await getSettings();
     const progress = await getDoc(profileId, 'progress');
@@ -128,8 +135,34 @@ export class Player {
       this.session = null;
       throw e;
     }
-    this.ui.showOsd();
+    await this.setWindow(mode);
     await this._loadCurrent({ resume });
+  }
+
+  /**
+   * Where the video goes: 'full' (full screen with the overlay), 'dock' (mini-player
+   * in the corner while browsing) or 'peek' (floating trailer preview). The same mpv
+   * keeps playing, so there's never a second stream.
+   */
+  async setWindow(mode) {
+    const mpv = this.mpv;
+    this.windowMode = mode;
+    if (mpv) {
+      if (mode === 'full') {
+        await mpv.set('ontop', false).catch(() => {});
+        await mpv.set('fullscreen', true).catch(() => {});
+      } else {
+        await mpv.set('fullscreen', false).catch(() => {});
+        await mpv.set('geometry', this.ui.pipGeometry(mode)).catch(() => {});
+        await mpv.set('ontop', true).catch(() => {});
+      }
+    }
+    if (mode === 'full') this.ui.showOsd();
+    else this.ui.windowed(mode, this.state?.item || this.session?.items[this.session.index]);
+    if (this.state) {
+      this.state.window = mode;
+      this._broadcast(true);
+    }
   }
 
   /**
@@ -188,6 +221,8 @@ export class Player {
       tracks: { audio: [], sub: [], aid: null, sid: null },
       error: null,
       autoNext,
+      window: this.windowMode,
+      pipOnBack: s.settings.pipOnBack !== false,
       freeze, // last picture of the previous channel, shown until this one starts
       next: item.kind === 'episode' && s.items[s.index + 1] ? s.items[s.index + 1] : null,
       loadedAt: Date.now(),
@@ -435,13 +470,18 @@ export class Player {
         return mpv.command('add', 'volume', cmd.delta);
       case 'stop':
         return this.stop({ reason: 'user' });
+      case 'dock':
+        return this.setWindow('dock');
+      case 'undock':
+        return this.setWindow('full');
     }
   }
 
   async stop({ reason = 'user' } = {}) {
     if (!this.session) return;
     this._saveProgress();
-    const summary = { reason, profileId: this.session.profileId, item: this.state?.item, index: this.session.index };
+    const summary = { reason, profileId: this.session.profileId, item: this.state?.item, index: this.session.index, window: this.windowMode };
+    this.windowMode = 'full';
     this.session = null;
     this.state = null;
     clearTimeout(this.sendTimer);

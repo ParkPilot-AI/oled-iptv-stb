@@ -68,7 +68,7 @@ const EVENTS = new Set([
   'player:key',
   'system:update:progress',
   'volume:changed',
-  'games:state',
+  'games:state', 'player:window',
 ]);
 
 contextBridge.exposeInMainWorld('iptv', {

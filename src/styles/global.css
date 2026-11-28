@@ -2239,3 +2239,28 @@ small {
   background: var(--pad);
   color: #000;
 }
+
+/* ---------- Mini-player caption (mpv's window sits just below it) ---------- */
+.dock-caption {
+  position: fixed;
+  z-index: 240;
+  right: 2.5vw;
+  bottom: calc(6vw + 16.875vw + 0.6vw);
+  width: 30vw;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1rem;
+  color: var(--text);
+  text-shadow: 0 1px 6px #000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dock-caption .live-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--live);
+  flex: none;
+}

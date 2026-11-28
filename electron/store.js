@@ -138,6 +138,7 @@ export const DEFAULT_SETTINGS = {
   trailers: true, // Trailer button on film/series pages (needs a TMDB key and yt-dlp)
   ytdlpPath: '', // custom yt-dlp binary; empty = bundled, then PATH
   showGames: false,
+  pipOnBack: true, // Back from live TV / a trailer keeps it playing in a corner
   showHints: true, // button hints, bottom right
   uiSounds: true, // navigation clicks
   rumble: true, // controller rumble on edges and dialogs // 'Games' (GeForce NOW) in the side menu

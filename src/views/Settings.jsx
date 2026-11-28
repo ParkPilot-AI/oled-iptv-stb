@@ -379,6 +379,7 @@ export function Settings() {
           {C('Live stream format', 'liveFormat')}
           {C('Hide on-screen controls after', 'osdTimeoutSec')}
           {C('Screensaver when paused', 'screensaverMin')}
+          <Toggle label="Back keeps live TV playing in a corner" on={settings.pipOnBack !== false} onChange={(on) => update({ pipOnBack: on })} />
           <h2>Parental</h2>
           <AdultRows settings={settings} />
           <TextField

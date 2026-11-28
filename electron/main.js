@@ -24,6 +24,7 @@ import * as adult from './adult.js';
 import { createBluetooth } from './bluetooth.js';
 import { createGames, GFN_DOWNLOAD_URL } from './games.js';
 import { watchSignin, createSigninWindow, signinDir } from './signin.js';
+import { pipRect, mpvGeometry } from './pip.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -236,9 +237,44 @@ function sendMain(channel, data) {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(channel, data);
 }
 
+// While the mini-player or a trailer preview floats above the menus, the main
+// window leaves full-screen mode (same size, no border): a focused full-screen
+// window would otherwise be stacked above the always-on-top video.
+let mainWasFull = null;
+function mainWindowed(on) {
+  if (!mainWin || mainWin.isDestroyed()) return;
+  if (on) {
+    if (mainWasFull == null) mainWasFull = mainWin.isFullScreen();
+    if (mainWasFull) {
+      const b = screen.getDisplayMatching(mainWin.getBounds()).bounds;
+      mainWin.setFullScreen(false);
+      mainWin.setBounds(b);
+    }
+  } else if (mainWasFull != null) {
+    if (mainWasFull) mainWin.setFullScreen(true);
+    mainWasFull = null;
+  }
+}
+
 const player = new Player({
   resourcesPath: process.resourcesPath,
+  pipGeometry(mode) {
+    const display = mainWin ? screen.getDisplayMatching(mainWin.getBounds()) : screen.getPrimaryDisplay();
+    return mpvGeometry(pipRect(mode, display));
+  },
+  windowed(mode, item) {
+    osdWin?.hide();
+    mainWindowed(true);
+    if (mainWin) {
+      mainWin.show();
+      mainWin.focus();
+    }
+    if (psbId == null) psbId = powerSaveBlocker.start('prevent-display-sleep');
+    sendMain('player:window', { mode, item });
+  },
   showOsd() {
+    mainWindowed(false);
+    sendMain('player:window', { mode: 'full' });
     if (!osdWin) createOsdWindow();
     const display = mainWin ? screen.getDisplayMatching(mainWin.getBounds()) : screen.getPrimaryDisplay();
     osdWin.setBounds(display.bounds);
@@ -252,6 +288,7 @@ const player = new Player({
   },
   hideOsd() {
     osdWin?.hide();
+    mainWindowed(false);
     if (mainWin) {
       mainWin.show();
       mainWin.focus();

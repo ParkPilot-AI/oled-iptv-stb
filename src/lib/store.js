@@ -102,8 +102,7 @@ export function toast(message, ms = 2600) {
   setState({ toast: { message, id: Date.now() } });
   toastTimer = setTimeout(() => setState({ toast: null }), ms);
 }
-export const confirmDialog = (opts) =>
-  new Promise((resolve) => setState({ confirm: { ...opts, resolve } }));
+export const confirmDialog = (opts) => new Promise((resolve) => setState({ confirm: { ...opts, resolve } }));
 
 // ---------- boot / profiles ----------
 export async function boot() {
@@ -185,7 +184,12 @@ export async function reloadCatalog() {
 }
 api.on('epg:progress', (p) => p.mb && setState({ epgStatus: `Loading guide… ${p.mb} MB` }));
 api.on('epg:updated', () => setState((s) => ({ epgVersion: s.epgVersion + 1 })));
+// Mini-player / trailer preview: the video floats above the menus.
+api.on('player:window', ({ mode, item } = {}) => setState({ docked: mode && mode !== 'full' ? { mode, item } : null }));
+
 api.on('player:closed', async (summary) => {
+  setState({ docked: null });
+  if (summary?.reason === 'replaced') return;
   // Back from a trailer: return to its page with focus on the Trailer button.
   if (summary?.item?.kind === 'trailer') {
     requestAnimationFrame(() => document.querySelector('.detail [data-trailer]')?.focus());
@@ -245,7 +249,10 @@ export async function play(items, index = 0) {
 export function openItem(item, list) {
   if (item.kind === 'live') {
     const items = list?.length ? list : [item];
-    const idx = Math.max(0, items.findIndex((i) => i.id === item.id));
+    const idx = Math.max(
+      0,
+      items.findIndex((i) => i.id === item.id)
+    );
     return play(items, idx);
   }
   if (item.kind === 'movie' || item.kind === 'series') return setState({ detail: { kind: item.kind, item } });
