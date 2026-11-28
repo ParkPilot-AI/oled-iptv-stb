@@ -135,6 +135,8 @@ export const DEFAULT_SETTINGS = {
   screensaverMin: 3,
   startFullscreen: true,
   theme: 'amber', // amber | cyan | crimson | violet | mono
+  trailers: true, // Trailer button on film/series pages (needs a TMDB key and yt-dlp)
+  ytdlpPath: '', // custom yt-dlp binary; empty = bundled, then PATH
   showAdult: false, // adult channels hidden unless switched on (PIN-guarded if a PIN is set)
   adultPinHash: '',
   overscan: 0, // per-edge safe margin for TVs that crop the picture

@@ -136,6 +136,22 @@ export async function getArtwork({ kind, id, name, year, tmdbId }) {
   return p;
 }
 
+/**
+ * Other per-title lookups (e.g. trailers) share this cache and its TTLs:
+ * 30 days for a hit, 7 days for "nothing found".
+ */
+export async function artCacheGet(key) {
+  await loadCache();
+  const h = cache[key];
+  if (h && Date.now() - h.at < (h.miss ? TTL_MISS : TTL_HIT)) return { hit: true, value: h.miss ? null : h.value };
+  return { hit: false, value: null };
+}
+export async function artCachePut(key, value) {
+  await loadCache();
+  cache[key] = value ? { at: Date.now(), value } : { at: Date.now(), miss: true };
+  persist();
+}
+
 /** Validate a key from Settings. */
 export async function testTmdbKey(key) {
   await tmdb('/configuration', {}, key.trim());

@@ -13,21 +13,29 @@ export function makeIpcPath() {
   return process.platform === 'win32' ? `\\\\.\\pipe\\${id}` : path.join(os.tmpdir(), `${id}.sock`);
 }
 
-/** Resolve the mpv binary: custom setting → bundled resource → PATH. */
-export function resolveMpvBinary({ customPath, resourcesPath } = {}) {
-  const exe = process.platform === 'win32' ? 'mpv.exe' : 'mpv';
+/**
+ * Resolve a helper binary: custom setting → bundled resource (resources/mpv/<exe>,
+ * dev: resources/mpv/<win|linux>/<exe>) → PATH. Used for mpv and yt-dlp.
+ */
+export function resolveTool(name, { customPath, resourcesPath, platform = process.platform, env = process.env, exists = fs.existsSync } = {}) {
+  const exe = platform === 'win32' ? `${name}.exe` : name;
+  const join = platform === 'win32' ? path.win32.join : path.posix.join;
   const candidates = [];
   if (customPath) candidates.push(customPath);
-  if (resourcesPath) candidates.push(path.join(resourcesPath, 'mpv', exe));
-  // Dev mode: resources/mpv/<os>/ inside the repo.
-  candidates.push(path.join(process.cwd(), 'resources', 'mpv', process.platform === 'win32' ? 'win' : 'linux', exe));
-  for (const c of candidates) if (c && fs.existsSync(c)) return c;
-  const dirs = (process.env.PATH || '').split(path.delimiter);
-  for (const d of dirs) {
-    const p = path.join(d, exe);
-    if (fs.existsSync(p)) return p;
+  if (resourcesPath) candidates.push(join(resourcesPath, 'mpv', exe));
+  candidates.push(join(process.cwd(), 'resources', 'mpv', platform === 'win32' ? 'win' : 'linux', exe));
+  for (const c of candidates) if (c && exists(c)) return c;
+  for (const d of (env.PATH || env.Path || '').split(platform === 'win32' ? ';' : ':')) {
+    if (!d) continue;
+    const p = join(d, exe);
+    if (exists(p)) return p;
   }
   return null;
+}
+
+/** Resolve the mpv binary: custom setting → bundled resource → PATH. */
+export function resolveMpvBinary({ customPath, resourcesPath } = {}) {
+  return resolveTool('mpv', { customPath, resourcesPath });
 }
 
 /** Keys pressed while the mpv window has focus are routed back to the app. */

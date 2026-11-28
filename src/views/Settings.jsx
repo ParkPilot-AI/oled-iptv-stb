@@ -26,6 +26,7 @@ const OPTIONS = {
   artSource: [['prefer', 'TMDB first (recommended)'], ['missing', 'Provider first, TMDB for gaps'], ['off', 'Off']],
   logoSource: [['prefer', 'Official logos (recommended)'], ['missing', 'Provider first'], ['off', 'Provider logos only']],
   subMode: [['off', 'Off'], ['on', 'On']],
+  trailers: [[true, 'On'], [false, 'Off']],
   aspect: [['auto', 'Original'], ['16:9', '16:9'], ['4:3', '4:3'], ['21:9', 'Cinema 21:9'], ['zoom', 'Zoom to fill'], ['stretch', 'Stretch to fill']],
   upscaling: [['standard', 'Standard'], ['high', 'High quality (more GPU)'], ['fast', 'Fast (weak PCs)']],
   deband: [[false, 'Off'], [true, 'On (smooths blocky gradients)']],
@@ -326,6 +327,7 @@ export function Settings() {
           <TextField label="TMDB API key" value={settings.tmdbKey || ''} mask onChange={saveTmdbKey} placeholder="Free at themoviedb.org → Settings → API" />
           {C('Movie & series artwork', 'artSource')}
           {C('Channel logos', 'logoSource')}
+          {C('Trailers', 'trailers')}
           <Action
             label="Re-match channel logos now"
             value={job.busy.logos ? 'Matching…' : ''}
@@ -361,6 +363,7 @@ export function Settings() {
           <h2>About ONYX</h2>
           <InfoRow label="Version" value={info ? `${info.version}${info.build ? ` · build ${info.build}` : ''} · ${info.platform}` : ''} />
           <InfoRow label="mpv" value={info?.mpvPath || 'Not found — see README'} />
+          <InfoRow label="yt-dlp (trailers)" value={info ? info.ytdlpPath || 'yt-dlp not found' : ''} />
           <InfoRow label="Credential storage" value={profiles.secureStorage ? 'OS keystore (encrypted)' : 'Obfuscated (no keystore)'} />
         </div>
       </>

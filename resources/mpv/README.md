@@ -10,3 +10,8 @@ archive suits any 7th-gen+ Intel Core i3; extract only `mpv.exe`).
 or `dnf install mpv`), or drop a static mpv binary there.
 
 Lookup order at runtime: Settings → "Custom mpv path" → bundled → `PATH`.
+
+**yt-dlp (trailers)** is found the same way: `yt-dlp.exe` (Windows) or `yt-dlp`
+(Linux) next to mpv here, otherwise on `PATH` (the set-top box installs the Arch
+`yt-dlp` package). Settings → System shows which one is used, or "yt-dlp not found",
+in which case the Trailer button is hidden.

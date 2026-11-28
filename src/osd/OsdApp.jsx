@@ -135,6 +135,11 @@ export default function OsdApp() {
       }
       const live = s.kind === 'live';
       const vod = !live;
+      // Trailers: no favourites, channel numbers or zapping.
+      if (s.kind === 'trailer' && ['fav', 'digit', 'chUp', 'chDown', 'next', 'prev'].includes(action)) {
+        e.preventDefault?.();
+        return;
+      }
 
       if (action === 'digit' && live) {
         const d = (digits + e.key).slice(-4);

@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { useStore, setState, getState, play, toggleFavorite, isFavorite } from '../lib/store.js';
 import { Focusable } from '../components/Focusable.jsx';
 import { LazyImg } from '../components/Cards.jsx';
+import { TrailerButton } from '../components/TrailerButton.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { useBack } from '../nav/keys.js';
 import { pushScope, focusFirst } from '../nav/spatial.js';
@@ -99,6 +100,7 @@ export function MovieDetail({ item }) {
             <Focusable className={`btn ${resumable ? '' : 'btn-primary'}`} autoFocus={!resumable} onSelect={() => start(true)}>
               <Icon name="play" /> {resumable ? 'Play from start' : 'Play'}
             </Focusable>
+            <TrailerButton item={item} tmdbId={info?.tmdbId} title={m.name} />
             <Focusable className={`btn ${fav ? 'is-on' : ''}`} onSelect={() => toggleFavorite(item)}>
               <Icon name="star" /> {fav ? 'In Favourites' : 'Add to Favourites'}
             </Focusable>

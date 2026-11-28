@@ -185,7 +185,12 @@ export async function reloadCatalog() {
 }
 api.on('epg:progress', (p) => p.mb && setState({ epgStatus: `Loading guide… ${p.mb} MB` }));
 api.on('epg:updated', () => setState((s) => ({ epgVersion: s.epgVersion + 1 })));
-api.on('player:closed', async () => {
+api.on('player:closed', async (summary) => {
+  // Back from a trailer: return to its page with focus on the Trailer button.
+  if (summary?.item?.kind === 'trailer') {
+    requestAnimationFrame(() => document.querySelector('.detail [data-trailer]')?.focus());
+    return;
+  }
   const pid = state.profileId;
   if (!pid) return;
   const [progress, favorites] = await Promise.all([

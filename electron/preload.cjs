@@ -13,6 +13,8 @@ const INVOKE = new Set([
   'discover:lists',
   'adult:show',
   'adult:pin',
+  'trailer:get',
+  'trailer:play',
   'discover:recs',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',

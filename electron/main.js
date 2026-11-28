@@ -15,8 +15,9 @@ import * as catalog from './catalog.js';
 import { authenticate, normalizeServer } from './xtream.js';
 import { registerImageScheme, handleImageProtocol, pruneImageCache, clearImageCache } from './imageCache.js';
 import { Player } from './player.js';
-import { getArtwork, testTmdbKey, clearArtworkCache } from './artwork.js';
-import { resolveMpvBinary } from './mpv.js';
+import { getArtwork, testTmdbKey, clearArtworkCache, tmdb, artCacheGet, artCachePut } from './artwork.js';
+import { createTrailers, trailerLoad } from './trailers.js';
+import { resolveMpvBinary, resolveTool } from './mpv.js';
 import * as audio from './audio.js';
 import { userDataDir } from './paths.js';
 import * as adult from './adult.js';
@@ -229,6 +230,21 @@ const player = new Player({
   },
 });
 
+// ---------- trailers ----------
+const ytdlpPath = async () => resolveTool('yt-dlp', { customPath: (await store.getSettings()).ytdlpPath, resourcesPath: process.resourcesPath });
+const trailers = createTrailers({
+  findTmdbId: async (item) => item.tmdbId || (await getArtwork(item).catch(() => null))?.tmdbId || null,
+  tmdb: async (p, params) => tmdb(p, params, ((await store.getSettings()).tmdbKey || '').trim()),
+  cacheGet: artCacheGet,
+  cachePut: artCachePut,
+  ytdlpPath,
+});
+const trailersOn = async () => {
+  const s = await store.getSettings();
+  return !!(s.tmdbKey || '').trim() && s.trailers !== false;
+};
+const titleItem = (it) => ({ kind: it?.kind, id: it?.id, name: it?.name, year: it?.year, tmdbId: it?.tmdbId });
+
 // ---------- IPC ----------
 const handlers = {
   'app:info': async () => {
@@ -237,6 +253,7 @@ const handlers = {
       version: app.getVersion(),
       platform: process.platform,
       mpvPath: resolveMpvBinary({ customPath: s.mpvPath, resourcesPath: process.resourcesPath }),
+      ytdlpPath: resolveTool('yt-dlp', { customPath: s.ytdlpPath, resourcesPath: process.resourcesPath }),
       build: (() => {
         try {
           return fs.readFileSync(path.join(path.dirname(process.execPath), 'stb-version.txt'), 'utf8').trim();
@@ -338,6 +355,13 @@ const handlers = {
   'art:get': (q) => getArtwork(q),
   'art:testKey': (key) => testTmdbKey(key),
   'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
+  'trailer:get': async ({ item }) => ((await trailersOn()) ? trailers.get(titleItem(item)) : { available: false }),
+  'trailer:play': async ({ profileId, item, title }) => {
+    const t = await trailers.prepare(titleItem(item));
+    if (!t) throw new Error('No trailer found');
+    const trailer = { kind: 'trailer', id: `yt:${t.key}`, name: title || item.name, load: trailerLoad(t), from: { kind: item.kind, id: item.id } };
+    await player.play({ profileId, items: [trailer], index: 0, resume: false });
+  },
   'discover:recs': ({ item }) => discover.getRecommendations(item),
   'art:refreshLogos': async ({ profileId }) => {
     if ((await store.getSettings()).logoSource === 'off') throw new Error('Channel logos are set to "Provider logos only"');

@@ -21,3 +21,8 @@ test('all worker dependencies are unpacked from asar', () => {
   const missing = [...seen].filter((f) => !covered(f));
   assert.deepEqual(missing, []);
 });
+
+test('the box installs the players: mpv and yt-dlp (trailers)', () => {
+  const pk = fs.readFileSync('stb/overlay/airootfs/root/stb-files/packages.txt', 'utf8').split(/\s+/);
+  for (const p of ['mpv', 'yt-dlp']) assert.ok(pk.includes(p), `${p} missing from packages.txt`);
+});

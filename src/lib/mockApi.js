@@ -128,7 +128,7 @@ export function createMockApi() {
   const emit = (ch, data) => listeners.get(ch)?.forEach((cb) => cb(data));
   let catalog = null;
   let vol = { volume: 60, muted: false };
-  let settings = { overscan: 0, tmdbKey: '', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, theme: 'amber', audioDevice: 'auto', subMode: 'off', brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', audioLang: 'auto', audioDelayMs: 0, nightMode: 'off', passthrough: false, speakers: 'auto', artSource: 'prefer', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
+  let settings = { overscan: 0, tmdbKey: '', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, theme: 'amber', trailers: true, audioDevice: 'auto', subMode: 'off', brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', audioLang: 'auto', audioDelayMs: 0, nightMode: 'off', passthrough: false, speakers: 'auto', artSource: 'prefer', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const wifi = {
@@ -141,7 +141,7 @@ export function createMockApi() {
   };
 
   const handlers = {
-    'app:info': () => ({ version: '1.0.0-web', platform: 'web', mpvPath: null, dataDir: '(browser)', build: '2026.11.27-a0acc2f', updater: true }),
+    'app:info': () => ({ version: '1.0.0-web', platform: 'web', mpvPath: null, ytdlpPath: '/usr/bin/yt-dlp', dataDir: '(browser)', build: '2026.11.27-a0acc2f', updater: true }),
     'app:quit': () => emit('mock:quit'),
     'system:poweroff': () => emit('mock:quit'),
     'volume:change': ({ action }) => {
@@ -317,6 +317,16 @@ export function createMockApi() {
     },
     'doc:get': ({ profileId, name }) => ls.get(`${profileId}:${name}`, {}),
     'doc:set': ({ profileId, name, data }) => ls.set(`${profileId}:${name}`, data),
+    'trailer:get': async ({ item }) => {
+      await wait(200);
+      return settings.tmdbKey && settings.trailers !== false && item?.id % 3 !== 0 ? { available: true, name: 'Official Trailer' } : { available: false };
+    },
+    'trailer:play': async ({ item, title }) => {
+      // Browser demo: no mpv. Simulate a short trailer and come back to the page.
+      console.info('[mock] trailer', title, item);
+      await wait(400);
+      setTimeout(() => emit('player:closed', { reason: 'ended', item: { kind: 'trailer', name: title } }), 1200);
+    },
     'player:play': async (args) => {
       // Browser mode cannot launch mpv: simulate a short session.
       console.info('[mock] play', args.items[args.index]);
