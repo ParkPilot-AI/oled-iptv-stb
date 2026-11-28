@@ -149,8 +149,9 @@ export function homeCountryOf(items) {
 
 export const GENRES = ['entertainment', 'documentaries', 'kids', 'movies', 'music', 'sports', 'news', 'international', 'adult'];
 const ENGLISH = new Set(['GB', 'US', 'IE', 'CA', 'AU']);
+export const ADULT_RE = /\b(xxx|adult|18\+|porn|playboy|hustler|brazzers|private|dorcel|redlight|blue hustler)\b/i;
 const RULES = [
-  ['adult', /\b(xxx|adult|18\+|porn|playboy|hustler|brazzers|private|dorcel|redlight|blue hustler)\b/i],
+  ['adult', ADULT_RE],
   ['kids', /\b(kids?|child(ren)?|cartoons?|junior|jr|baby|toons?|cbeebies|cbbc|nick(elodeon|jr|toons)?|disney (channel|jr|junior|xd)|boomerang|pop|tiny pop|cartoonito|ketchup|duck ?tv|kika|gulli)\b/i],
   ['sports', /\b(sports?|football|soccer|futbol|nba|nfl|nhl|mlb|f1|formula|golf|racing|tennis|cricket|boxing|ufc|wwe|ppv|espn|eurosport|bein|dazn|tnt sport|premier league|la ?liga|serie a|bundesliga|motogp|rugby|darts|snooker|racing tv|sky sports|bt sport|arena sport|supersport)\b/i],
   ['news', /\b(news|cnn|bbc news|sky news|fox news|msnbc|cnbc|bloomberg|al ?jazeera|euronews|france ?24|dw|rt|gb ?news|newsmax|talk ?tv|parliament|weather)\b/i],

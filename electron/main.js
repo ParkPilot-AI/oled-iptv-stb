@@ -19,6 +19,7 @@ import { getArtwork, testTmdbKey, clearArtworkCache } from './artwork.js';
 import { resolveMpvBinary } from './mpv.js';
 import * as audio from './audio.js';
 import { userDataDir } from './paths.js';
+import * as adult from './adult.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -294,13 +295,16 @@ const handlers = {
     return authenticate(await store.getCredentials(id)).catch((e) => ({ error: e.message }));
   },
 
-  'settings:get': () => store.getSettings(),
+  'settings:get': async () => adult.publicSettings(await store.getSettings()),
   'settings:update': async (patch) => {
+    patch = Object.fromEntries(Object.entries(patch || {}).filter(([k]) => !adult.PROTECTED_KEYS.includes(k)));
     if ('audioDevice' in patch) await audio.applyOutput(patch.audioDevice);
     const s = await store.updateSettings(patch);
     if (Object.keys(patch).some((k) => LIVE_KEYS.has(k))) await player.applySettings(s);
-    return s;
+    return adult.publicSettings(s);
   },
+  'adult:show': async (arg) => adult.publicSettings(await store.updateSettings(adult.showAdultPatch(await store.getSettings(), arg || {}))),
+  'adult:pin': async (arg) => adult.publicSettings(await store.updateSettings(adult.pinPatch(await store.getSettings(), arg || {}))),
   'volume:change': async ({ action }) => {
     let r = await audio.systemVolume(action).catch(() => null);
     if (!r && player.mpv) r = await player.volume(action); // Windows/macOS: mpv's own volume

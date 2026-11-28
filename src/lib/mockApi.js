@@ -40,7 +40,7 @@ const backdropArt = (seed) => art(seed + 3, 1600, 900, '');
 function makeCatalog() {
   const r = rnd(42);
   const pick = (a) => a[Math.floor(r() * a.length)];
-  const liveCats = ['UK | Entertainment', 'UK | Sports', 'UK | News', 'US | Entertainment', 'US | Sports', 'DE | Allgemein', 'FR | Général', 'Kids', 'Documentary', 'Music', '4K UHD', 'PPV Events']
+  const liveCats = ['UK | Entertainment', 'UK | Sports', 'UK | News', 'US | Entertainment', 'US | Sports', 'DE | Allgemein', 'FR | Général', 'Kids', 'Documentary', 'Music', '4K UHD', 'PPV Events', 'Adult 18+']
     .concat(Array.from({ length: 28 }, (_, i) => `Region ${i + 1}`))
     .map((name, i) => ({ id: String(i + 1), name }));
   const live = Array.from({ length: 10000 }, (_, i) => ({
@@ -170,7 +170,20 @@ export function createMockApi() {
       ls.set('profiles', profiles);
       return { user: { status: 'Active', expires: Date.now() + 90 * 864e5, maxConnections: 2 } };
     },
-    'settings:get': () => settings,
+    'settings:get': () => ({ ...settings, adultPinSet: !!settings.adultPin }),
+    'adult:show': ({ show, pin }) => {
+      if (show && settings.adultPin && pin !== settings.adultPin) throw new Error('Wrong PIN');
+      settings = { ...settings, showAdult: !!show };
+      ls.set('settings', settings);
+      return { ...settings, adultPinSet: !!settings.adultPin };
+    },
+    'adult:pin': ({ pin, current }) => {
+      if (settings.adultPin && current !== settings.adultPin) throw new Error('Wrong PIN');
+      if (pin && !/^\d{4}$/.test(pin)) throw new Error('The PIN must be 4 digits');
+      settings = { ...settings, adultPin: pin || '' };
+      ls.set('settings', settings);
+      return { ...settings, adultPinSet: !!settings.adultPin };
+    },
     'audio:outputs': async () => {
       await wait(300);
       return { backend: 'pactl', current: settings.audioDevice || 'auto', outputs: [
@@ -181,9 +194,10 @@ export function createMockApi() {
       ] };
     },
     'settings:update': (patch) => {
-      settings = { ...settings, ...patch };
+      const { showAdult: _a, adultPin: _p, ...safe } = patch || {};
+      settings = { ...settings, ...safe };
       ls.set('settings', settings);
-      return settings;
+      return { ...settings, adultPinSet: !!settings.adultPin };
     },
     'catalog:load': async () => {
       emit('catalog:progress', { stage: 'categories' });

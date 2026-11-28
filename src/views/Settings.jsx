@@ -3,6 +3,7 @@ import { api } from '../lib/api.js';
 import { useStore, setState, getState, toast, confirmDialog, activateProfile, loadEpg, applyTheme, applyScreenFit, reloadCatalog, powerOff } from '../lib/store.js';
 import { clearArtCache } from '../lib/art.js';
 import { THEMES } from '../lib/theme.js';
+import { AdultRows } from '../components/AdultSettings.jsx';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
 import { UpdateRow } from '../components/SystemUpdate.jsx';
@@ -187,6 +188,8 @@ export function Settings() {
           {C('Live stream format', 'liveFormat')}
           {C('Hide on-screen controls after', 'osdTimeoutSec')}
           {C('Screensaver when paused', 'screensaverMin')}
+          <h2>Parental</h2>
+          <AdultRows settings={settings} />
           <TextField label="Custom mpv path" value={settings.mpvPath} onChange={(v) => update({ mpvPath: v })} placeholder={info?.mpvPath ? `Using ${info.mpvPath}` : 'mpv not found'} />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">

@@ -135,6 +135,8 @@ export const DEFAULT_SETTINGS = {
   screensaverMin: 3,
   startFullscreen: true,
   theme: 'amber', // amber | cyan | crimson | violet | mono
+  showAdult: false, // adult channels hidden unless switched on (PIN-guarded if a PIN is set)
+  adultPinHash: '',
   overscan: 0, // per-edge safe margin for TVs that crop the picture
   tmdbKey: '', // free key from themoviedb.org (v3 key or v4 read token)
   artSource: 'prefer', // movies/series artwork: prefer (TMDB first) | missing (provider first) | off

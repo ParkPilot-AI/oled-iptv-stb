@@ -11,6 +11,8 @@ const INVOKE = new Set([
   'system:poweroff',
   'volume:change',
   'discover:lists',
+  'adult:show',
+  'adult:pin',
   'discover:recs',
   'catalog:load', 'epg:load', 'epg:nowNext', 'epg:range', 'epg:grid', 'epg:short',
   'vod:info', 'series:info', 'cache:clear',
