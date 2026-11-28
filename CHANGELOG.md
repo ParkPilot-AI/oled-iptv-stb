@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0
+
+### New
+- **Bold themes** (Settings → General → Theme): **Studio Red**, **Arena Green**, **Royal Blue**,
+  **Stream Purple** and **Molten Orange**. Deeper, saturated colours with a stronger glow and a
+  thicker focus ring; the current menu icon and selected tab take the colour, and a very dark
+  wash of it sits behind the menus (kept near black to be kind to the OLED panel). The original
+  five themes are unchanged.
+
 ## 1.2.4
 
 ### Fixed
