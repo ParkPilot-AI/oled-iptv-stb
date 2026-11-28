@@ -12,9 +12,11 @@ import {
   applyScreenFit,
   reloadCatalog,
   powerOff,
+  sleep,
 } from '../lib/store.js';
 import { clearArtCache } from '../lib/art.js';
 import { THEMES } from '../lib/theme.js';
+import { ProfileRows } from '../components/ProfileSettings.jsx';
 import { AdultRows } from '../components/AdultSettings.jsx';
 import { ControllerSettings } from '../components/ControllerSettings.jsx';
 import { Focusable } from '../components/Focusable.jsx';
@@ -298,6 +300,17 @@ function useJob() {
   return { busy, run };
 }
 
+/** What's updating in the background (playlist, TV guide, channel logos). */
+function SyncRow() {
+  const tasks = useStore((s) => s.sync.tasks);
+  return (
+    <div className="setting-row is-static">
+      <span>Background updates</span>
+      <span className="setting-value muted">{tasks.length ? `${tasks.join(' · ')}…` : 'Up to date'}</span>
+    </div>
+  );
+}
+
 function Action({ label, value, onSelect, danger }) {
   return (
     <Focusable className={`setting-row ${danger ? 'is-danger' : ''}`} onSelect={onSelect}>
@@ -332,6 +345,7 @@ const PICTURE_RESET = {
 
 export function Settings() {
   const settings = useStore((s) => s.settings);
+  const viewer = useStore((s) => s.viewer);
   const pid = useStore((s) => s.profileId);
   const epgStatus = useStore((s) => s.epgStatus);
   const catalog = useStore((s) => s.catalog);
@@ -379,8 +393,11 @@ export function Settings() {
           {C('Live stream format', 'liveFormat')}
           {C('Hide on-screen controls after', 'osdTimeoutSec')}
           {C('Screensaver when paused', 'screensaverMin')}
+          <Toggle label="Back keeps live TV playing in a corner" on={settings.pipOnBack !== false} onChange={(on) => update({ pipOnBack: on })} />
           <h2>Parental</h2>
-          <AdultRows settings={settings} />
+          {!viewer?.kids && <AdultRows settings={settings} />}
+          <h2>Profiles</h2>
+          <ProfileRows />
           <TextField
             label="Custom mpv path"
             value={settings.mpvPath}
@@ -396,6 +413,9 @@ export function Settings() {
           <Action label="Toggle fullscreen now" onSelect={() => api.invoke('app:toggleFullscreen')} />
           <h2>Menu</h2>
           <Toggle label="Show Games in sidebar" on={!!settings.showGames} onChange={(on) => update({ showGames: on })} />
+          <Toggle label="Button hints" on={settings.showHints !== false} onChange={(on) => update({ showHints: on })} />
+          <Toggle label="Navigation sounds" on={settings.uiSounds !== false} onChange={(on) => update({ uiSounds: on })} />
+          <Toggle label="Controller rumble" on={settings.rumble !== false} onChange={(on) => update({ rumble: on })} />
         </div>
       </>
     ),
@@ -496,6 +516,7 @@ export function Settings() {
           />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
+          <SyncRow />
           <h2>Artwork</h2>
           <TextField label="TMDB API key" value={settings.tmdbKey || ''} mask onChange={saveTmdbKey} placeholder="Free at themoviedb.org → Settings → API" />
           {C('Movie & series artwork', 'artSource')}
@@ -532,6 +553,7 @@ export function Settings() {
             </>
           )}
           <h2>Power</h2>
+          <Action label="Sleep" value="Stops playback, screen off · any key wakes" onSelect={() => sleep()} />
           <Action label="Power Off" danger onSelect={() => powerOff()} />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">

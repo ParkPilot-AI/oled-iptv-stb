@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.4.0
+
+### New
+- **Button hints** for the focused item (bottom right), named for the device you're using —
+  "OK · Back · Info" on a remote, coloured "A · B · Y" on a controller — fading out after 5 s.
+  **Navigation sounds** and **controller rumble** (row edges, dialogs), both switchable.
+- **Smoother channel changes:** the last picture stays up, dimmed, with a small "Tuning to…"
+  spinner until the next channel starts — no black screen. Typing a number shows
+  "104 — BBC One HD" and tunes after 1.2 s.
+- **Mini-player:** Back from live TV or a trailer keeps it playing in a corner while you
+  browse; Play/Pause returns to full screen, Stop or Back from the side menu closes it.
+- **Add a playlist from your phone:** scan the QR code on the playlist form and type the
+  details on your phone.
+- **Who's watching?** Household profiles with their own favourites, Continue Watching, recent
+  searches and theme; Kids profiles without adult content; optional PIN per profile.
+- **Up next** card in the last 30 s of an episode, with a 10-second countdown.
+- **Trailer preview:** Info (Y) on any film or series poster plays the trailer in a floating
+  window beside the grid.
+- **Search shortcuts:** Trending tonight, Live sports, 4K movies, Recently added, plus recent
+  searches.
+- **Sleep:** stops playback (freeing the provider connection) and switches the picture off;
+  any key wakes. Power/Standby keys and the Power-off dialog offer it too.
+- **Background updates** (playlist, TV guide, logos) are shown in Settings → Library, and
+  briefly after start-up.
+
+### Changed
+- Controller: **Y** is now Info / trailer preview and **Menu** is Favourite.
+- Only one stream is ever open (full screen, mini-player or preview), so single-connection
+  accounts are safe.
+- The playlist picker is titled "Choose a playlist".
+
 ## 1.3.0
 
 ### New

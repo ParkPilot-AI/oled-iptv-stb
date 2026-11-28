@@ -6,7 +6,9 @@ import { useSyncExternalStore } from 'react';
 import { api } from './api.js';
 
 let state = {
-  boot: 'loading', // loading | login | catalog | ready
+  boot: 'loading', // loading | viewer (who's watching?) | login | catalog | ready
+  viewers: { activeId: 'main', askOnStart: true, list: [] },
+  viewer: null, // the household profile in use
   profiles: { activeId: null, list: [], secureStorage: true },
   profileId: null,
   account: null,
@@ -23,6 +25,8 @@ let state = {
   detail: null, // {kind:'movie'|'series', item}
   toast: null,
   confirm: null,
+  sync: { tasks: [] }, // background updates (playlist, TV guide, logos)
+  sleeping: false,
 };
 const subs = new Set();
 export const getState = () => state;
@@ -75,7 +79,7 @@ function indexSection(sec, sortFn) {
  * All channels, Search, Home rows, zapping lists) comes from here, so the adult filter
  * applies everywhere. The unfiltered copies are kept for saving and for "Shown".
  */
-function view(raw = state.catalogRaw, favs = state.favoritesAll, show = !!state.settings?.showAdult) {
+function view(raw = state.catalogRaw, favs = state.favoritesAll, show = !!state.settings?.showAdult && !state.viewer?.kids) {
   const f = filterAdult(raw, show);
   const all = { live: [], movie: [], series: [], ...(favs || {}) };
   return { catalogRaw: raw, favoritesAll: all, catalog: raw ? indexCatalog(f.raw) : null, favorites: filterFavs(all, f.hidden, show) };
@@ -102,18 +106,51 @@ export function toast(message, ms = 2600) {
   setState({ toast: { message, id: Date.now() } });
   toastTimer = setTimeout(() => setState({ toast: null }), ms);
 }
-export const confirmDialog = (opts) =>
-  new Promise((resolve) => setState({ confirm: { ...opts, resolve } }));
+export const confirmDialog = (opts) => new Promise((resolve) => setState({ confirm: { ...opts, resolve } }));
 
 // ---------- boot / profiles ----------
 export async function boot() {
-  const [profiles, settings] = await Promise.all([api.invoke('profiles:list'), api.invoke('settings:get')]);
+  const [profiles, settings, viewers] = await Promise.all([api.invoke('profiles:list'), api.invoke('settings:get'), api.invoke('viewers:list')]);
   applyTheme(settings.theme);
   applyScreenFit(settings.overscan);
-  setState({ profiles, settings });
+  setState({ profiles, settings, viewers, viewer: viewers.list.find((v) => v.id === viewers.activeId) || viewers.list[0] || null });
+  if (needsViewerPicker(viewers)) return setState({ boot: 'viewer' });
+  await openPlaylist();
+}
+
+/** "Who's watching?" at start: several profiles (unless turned off), or a locked one. */
+export function needsViewerPicker(vs) {
+  const active = vs.list.find((v) => v.id === vs.activeId);
+  return (vs.askOnStart && vs.list.length > 1) || !!active?.locked;
+}
+
+async function openPlaylist() {
+  const { profiles } = state;
   if (profiles.activeId && profiles.list.some((p) => p.id === profiles.activeId)) {
     await activateProfile(profiles.activeId);
   } else setState({ boot: 'login' });
+}
+
+export async function refreshViewers() {
+  const viewers = await api.invoke('viewers:list');
+  setState({ viewers, viewer: viewers.list.find((v) => v.id === viewers.activeId) || state.viewer });
+  return viewers;
+}
+
+/** Switch household profile (PIN when locked): their own favourites, progress and theme. */
+export async function chooseViewer(id, pin) {
+  const r = await api.invoke('viewers:activate', { id, pin });
+  applyTheme(r.settings.theme);
+  setState((s) => ({ settings: r.settings, viewer: r.viewer, viewers: { ...s.viewers, activeId: id } }));
+  toast(`Watching as ${r.viewer.name}`);
+  const pid = state.profileId;
+  if (pid && state.catalogRaw) {
+    const [favorites, progress] = await Promise.all([
+      api.invoke('doc:get', { profileId: pid, name: 'favorites' }),
+      api.invoke('doc:get', { profileId: pid, name: 'progress' }),
+    ]);
+    setState({ ...view(state.catalogRaw, favorites), progress: progress || {}, boot: 'ready', section: 'home', detail: null });
+  } else await openPlaylist();
 }
 
 export { applyTheme } from './theme.js';
@@ -185,7 +222,12 @@ export async function reloadCatalog() {
 }
 api.on('epg:progress', (p) => p.mb && setState({ epgStatus: `Loading guide… ${p.mb} MB` }));
 api.on('epg:updated', () => setState((s) => ({ epgVersion: s.epgVersion + 1 })));
+// Mini-player / trailer preview: the video floats above the menus.
+api.on('player:window', ({ mode, item } = {}) => setState({ docked: mode && mode !== 'full' ? { mode, item } : null }));
+
 api.on('player:closed', async (summary) => {
+  setState({ docked: null });
+  if (summary?.reason === 'replaced') return;
   // Back from a trailer: return to its page with focus on the Trailer button.
   if (summary?.item?.kind === 'trailer') {
     requestAnimationFrame(() => document.querySelector('.detail [data-trailer]')?.focus());
@@ -245,7 +287,10 @@ export async function play(items, index = 0) {
 export function openItem(item, list) {
   if (item.kind === 'live') {
     const items = list?.length ? list : [item];
-    const idx = Math.max(0, items.findIndex((i) => i.id === item.id));
+    const idx = Math.max(
+      0,
+      items.findIndex((i) => i.id === item.id)
+    );
     return play(items, idx);
   }
   if (item.kind === 'movie' || item.kind === 'series') return setState({ detail: { kind: item.kind, item } });
@@ -277,6 +322,20 @@ export async function resumeEntry(entry) {
   }
 }
 
+// ---------- sleep ----------
+/** Stop playback (frees the provider connection) and switch the picture off. Any key wakes. */
+export async function sleep() {
+  setState({ sleeping: true, docked: null });
+  await api.invoke('system:sleep').catch(() => {});
+}
+export async function wake() {
+  if (!state.sleeping) return;
+  setState({ sleeping: false });
+  await api.invoke('system:wake').catch(() => {});
+}
+api.on('sync:status', (sync) => setState({ sync }));
+api.on('power:sleeping', () => setState({ sleeping: true, docked: null }));
+
 // ---------- power ----------
 /** "Power Off": shuts the set-top box down (closes the app on a normal PC). */
 export async function powerOff() {
@@ -286,8 +345,10 @@ export async function powerOff() {
     title: 'Power off?',
     message: box ? 'The box will shut down. Press its power button to turn it back on.' : 'ONYX will close.',
     confirmLabel: 'Power Off',
+    altLabel: 'Sleep',
     danger: true,
   });
+  if (ok === 'alt') return sleep();
   if (!ok) return;
   try {
     await api.invoke('system:poweroff');

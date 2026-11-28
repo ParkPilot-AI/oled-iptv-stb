@@ -1,6 +1,7 @@
 // Key normalisation + priority-ordered handler stacks for keys and "back".
 import { useEffect, useRef } from 'react';
 import { move } from './spatial.js';
+import { feedback } from '../lib/feedback.js';
 
 export function keyAction(e) {
   switch (e.key) {
@@ -40,6 +41,11 @@ export function keyAction(e) {
       return 'prev';
     case 'MediaStop':
       return 'stop';
+    case 'Standby':
+    case 'Power':
+    case 'PowerOff':
+    case 'Sleep':
+      return 'sleep';
     case 'AudioVolumeUp':
     case 'VolumeUp':
       return 'volUp';
@@ -146,7 +152,8 @@ export function dispatchKey(e, { onAnyKey } = {}) {
     case 'down':
     case 'left':
     case 'right':
-      move(action);
+      // A click as focus moves; a soft thud (and rumble) at the edge of a row.
+      feedback(move(action) ? 'move' : 'bump');
       break;
     case 'enter': {
       if (e.repeat) break;
@@ -161,11 +168,12 @@ export function dispatchKey(e, { onAnyKey } = {}) {
         }, LONG_PRESS_MS);
         break;
       }
+      if (el?.click) feedback('select');
       el?.click?.();
       break;
     }
     case 'back':
-      if (!e.repeat) runBack();
+      if (!e.repeat && runBack()) feedback('back');
       break;
   }
 }

@@ -57,7 +57,7 @@ export function ControllerSettings() {
           </div>
         ))}
         <p className="settings-reason">
-          A = OK · B = Back · D-pad or left stick = move · LB / RB = previous / next tab · X = play/pause · Y = favourite · Menu = info
+          A = OK · B = Back · D-pad or left stick = move · LB / RB = previous / next tab · X = play/pause · Y = info / trailer · Menu = favourite
         </p>
       </div>
       {!bt.windows && (

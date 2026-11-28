@@ -1,10 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff, toast } from './lib/store.js';
+import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff, toast, sleep, wake } from './lib/store.js';
 import { dispatchKey, dispatchKeyUp, setLongPressHandler, useBack, useKeyHandler, keyAction } from './nav/keys.js';
 import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
 import { JobModal, useProvision } from './components/SystemUpdate.jsx';
 import { startControllerWatch, btJustConnected } from './lib/controllers.js';
 import { startGamepadNav, padName } from './lib/gamepad.js';
+import { noteInput, configureFeedback } from './lib/feedback.js';
+import { HintBar } from './components/HintBar.jsx';
 import { api } from './lib/api.js';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';
 import { NavRail } from './components/NavRail.jsx';
@@ -19,6 +21,7 @@ import { Favorites } from './views/Favorites.jsx';
 import { Search } from './views/Search.jsx';
 import { Settings } from './views/Settings.jsx';
 import { Games } from './views/Games.jsx';
+import { WhoIsWatching } from './views/WhoIsWatching.jsx';
 import { MovieDetail } from './views/MovieDetail.jsx';
 import { SeriesDetail } from './views/SeriesDetail.jsx';
 
@@ -40,6 +43,8 @@ const UI_SCREENSAVER_MS = 10 * 60 * 1000;
 function MainApp() {
   const bootState = useStore((s) => s.boot);
   const rootRef = useRef(null);
+  const fbSettings = useStore((s) => s.settings);
+  useEffect(() => configureFeedback(fbSettings || {}), [fbSettings]);
   // While GeForce NOW has the screen, ONYX is hidden: no screensaver or pixel shift.
   const gamesRunning = useStore((s) => s.gamesRunning);
   const [idle, setIdle] = useIdle(UI_SCREENSAVER_MS, !gamesRunning);
@@ -79,7 +84,19 @@ function MainApp() {
 
   useEffect(() => {
     const onKey = (e) => {
+      noteInput(e);
+      // Asleep: the first key (or controller button) only wakes the screen.
+      if (getState().sleeping) {
+        e.preventDefault();
+        wake();
+        return;
+      }
       const act = keyAction(e);
+      if (act === 'sleep') {
+        e.preventDefault();
+        sleep();
+        return;
+      }
       if (act === 'volUp' || act === 'volDown' || act === 'mute') {
         e.preventDefault();
         changeVolume(act);
@@ -108,6 +125,47 @@ function MainApp() {
     };
   }, [setIdle]);
 
+  // Info (Y on a controller) on a film or series poster: floating trailer preview
+  // beside the grid. Info again, or Back, closes it; OK still opens the title.
+  useKeyHandler(
+    (action) => {
+      if (action !== 'info') return false;
+      const key = document.activeElement?.dataset?.fav;
+      const d = getState().docked;
+      if (d?.mode === 'peek') {
+        api.invoke('player:command', { type: 'stop' }).catch(() => {});
+        if (!key || (d.item?.from && `${d.item.from.kind}:${d.item.from.id}` === key)) return true;
+      }
+      if (!key || !/^(movie|series):/.test(key)) return false;
+      const item = favRegistry.get(key);
+      const s = getState().settings;
+      if (!item) return false;
+      if (!s?.tmdbKey || s.trailers === false) {
+        toast('Trailer previews need a TMDB key (Settings → Library)', 3500);
+        return true;
+      }
+      toast(`Loading trailer · ${item.name}`, 1800);
+      api
+        .invoke('trailer:play', {
+          profileId: getState().profileId,
+          item: { kind: item.kind, id: item.id, name: item.name, year: item.year, tmdbId: item.tmdbId },
+          title: item.name,
+          mode: 'peek',
+        })
+        .catch((e) => toast(String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 3500));
+      return true;
+    },
+    { priority: -10 }
+  );
+  useBack(
+    () => {
+      if (getState().docked?.mode !== 'peek') return false;
+      api.invoke('player:command', { type: 'stop' }).catch(() => {});
+      return true;
+    },
+    { priority: 50 }
+  );
+
   // Global: F toggles favorite on the focused item.
   useKeyHandler(
     (action) => {
@@ -122,6 +180,7 @@ function MainApp() {
   return (
     <div className="app" ref={rootRef}>
       {bootState === 'loading' && <Splash text="Starting…" />}
+      {bootState === 'viewer' && <WhoIsWatching />}
       {bootState === 'login' && <Login />}
       {bootState === 'catalog' && <CatalogLoading />}
       {bootState === 'ready' && <Shell />}
@@ -129,8 +188,12 @@ function MainApp() {
       {bootState === 'ready' && <ControllerWatch />}
       <ConfirmHost />
       <ToastHost />
+      {bootState === 'ready' && <DockCaption />}
+      {bootState === 'ready' && <SyncPill />}
+      {bootState === 'ready' && <HintBar />}
       <VolumeHud />
       {idle && <Screensaver />}
+      <SleepScreen />
     </div>
   );
 }
@@ -193,6 +256,44 @@ function CatalogLoading() {
   );
 }
 
+/** Pure black while asleep (the screen is also switched off on the box). */
+function SleepScreen() {
+  const on = useStore((s) => s.sleeping);
+  return on ? <div className="sleep-screen" /> : null;
+}
+
+const STARTED_AT = Date.now();
+/** "Updating TV guide…" while background updates run — only around start-up (OLED). */
+function SyncPill() {
+  const tasks = useStore((s) => s.sync.tasks);
+  const [early, setEarly] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setEarly(false), Math.max(0, 90000 - (Date.now() - STARTED_AT)));
+    return () => clearTimeout(t);
+  }, []);
+  if (!early || !tasks.length) return null;
+  return (
+    <div className="sync-pill">
+      <span className="spinner-sm" />
+      {tasks[0]}…
+    </div>
+  );
+}
+
+/** Caption above the mini-player (the video itself is mpv's window, floating above). */
+function DockCaption() {
+  const d = useStore((s) => s.docked);
+  if (!d || d.mode !== 'dock') return null;
+  const it = d.item || {};
+  return (
+    <div className="dock-caption">
+      <span className="live-dot" />
+      {it.num ? `${it.num} · ` : ''}
+      {it.name || 'Now playing'}
+    </div>
+  );
+}
+
 function Shell() {
   const section = useStore((s) => s.section);
   const detail = useStore((s) => s.detail);
@@ -202,12 +303,35 @@ function Shell() {
     requestAnimationFrame(() => focusFirst(contentRef.current));
   }, []);
 
-  // Base back behaviour: content → rail → exit confirmation.
+  // Mini-player / trailer preview: Play/Pause (X on a controller) goes back to
+  // full screen, Stop closes it.
+  useKeyHandler(
+    (action) => {
+      const d = getState().docked;
+      if (!d) return false;
+      if (action === 'playPause') {
+        api.invoke('player:command', { type: d.mode === 'peek' ? 'stop' : 'undock' }).catch(() => {});
+        return true;
+      }
+      if (action === 'stop') {
+        api.invoke('player:command', { type: 'stop' }).catch(() => {});
+        return true;
+      }
+      return false;
+    },
+    { priority: 40 }
+  );
+
+  // Base back behaviour: content → rail → (close the mini-player) → exit confirmation.
   useBack(
     () => {
       const inRail = document.activeElement?.closest('.rail');
       if (!inRail) {
         focusByKey(`rail-${getState().section}`) || focusGroup('rail');
+        return true;
+      }
+      if (getState().docked) {
+        api.invoke('player:command', { type: 'stop' }).catch(() => {});
         return true;
       }
       powerOff();

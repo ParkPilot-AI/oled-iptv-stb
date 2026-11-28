@@ -10,11 +10,11 @@ export const BUTTON_KEYS = {
   0: 'Enter', // A
   1: 'Escape', // B
   2: ' ', // X  play/pause
-  3: 'f', // Y  favourite
+  3: 'i', // Y  info / trailer preview
   4: 'PageUp', // LB  previous tab / channel
   5: 'PageDown', // RB  next tab / channel
   8: 'Escape', // View / Back / Select
-  9: 'i', // Menu / Start  info
+  9: 'f', // Menu / Start  favourite
 };
 const DIRS = { 12: 'ArrowUp', 13: 'ArrowDown', 14: 'ArrowLeft', 15: 'ArrowRight' };
 const STICK = 0.6; // left-stick dead zone

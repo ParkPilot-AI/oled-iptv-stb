@@ -7,7 +7,7 @@ import { Modal } from './Modal.jsx';
 import { VirtualKeyboard } from './VirtualKeyboard.jsx';
 
 /** Number-pad dialog that resolves with a 4-digit PIN (or nothing when closed). */
-function PinDialog({ title, onDone, onClose }) {
+export function PinDialog({ title, onDone, onClose }) {
   const [pin, setPin] = useState('');
   return (
     <Modal onClose={onClose} className="vkb-modal pin-modal">

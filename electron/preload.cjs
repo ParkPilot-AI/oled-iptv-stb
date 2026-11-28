@@ -32,6 +32,17 @@ const INVOKE = new Set([
   'games:status',
   'games:install',
   'games:launch',
+  'viewers:list',
+  'viewers:activate',
+  'viewers:save',
+  'viewers:pin',
+  'viewers:remove',
+  'viewers:askOnStart',
+  'sync:status',
+  'system:sleep',
+  'system:wake',
+  'phonelogin:start',
+  'phonelogin:stop',
   'bt:status',
   'bt:scan',
   'bt:pair',
@@ -68,7 +79,7 @@ const EVENTS = new Set([
   'player:key',
   'system:update:progress',
   'volume:changed',
-  'games:state',
+  'games:state', 'player:window', 'phonelogin:submit', 'sync:status', 'power:sleeping',
 ]);
 
 contextBridge.exposeInMainWorld('iptv', {

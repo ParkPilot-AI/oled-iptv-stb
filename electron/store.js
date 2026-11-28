@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { defaultViewers, viewerDocDir, MAIN } from './viewers.js';
 
 export const dataDir = () => app.getPath('userData');
 export const profileDir = (profileId) => {
@@ -137,7 +138,11 @@ export const DEFAULT_SETTINGS = {
   theme: 'amber', // amber | cyan | crimson | violet | mono | bold: red | green | blue | purple | orange
   trailers: true, // Trailer button on film/series pages (needs a TMDB key and yt-dlp)
   ytdlpPath: '', // custom yt-dlp binary; empty = bundled, then PATH
-  showGames: false, // 'Games' (GeForce NOW) in the side menu
+  showGames: false,
+  pipOnBack: true, // Back from live TV / a trailer keeps it playing in a corner
+  showHints: true, // button hints, bottom right
+  uiSounds: true, // navigation clicks
+  rumble: true, // controller rumble on edges and dialogs // 'Games' (GeForce NOW) in the side menu
   provisionPrompted: false, // the one-time "Finish installing the update" prompt was shown
   showAdult: false, // adult channels hidden unless switched on (PIN-guarded if a PIN is set)
   adultPinHash: '',
@@ -197,44 +202,65 @@ export async function updateSettings(patch) {
   return s;
 }
 
-// ---------- per-profile documents (favorites, progress) ----------
-const DOCS = new Set(['favorites', 'progress', 'ui']);
-const docCache = new Map(); // key -> {data, timer}
+// ---------- household profiles ("Who's watching?") ----------
+const viewersFile = () => path.join(dataDir(), 'viewers.json');
+let viewersCache = null;
+export async function loadViewers() {
+  viewersCache ??= await readJson(viewersFile(), defaultViewers());
+  if (!viewersCache.list?.length) viewersCache = defaultViewers();
+  return viewersCache;
+}
+export async function saveViewers() {
+  await writeJson(viewersFile(), viewersCache);
+}
+/** Whose favourites / progress are read and written (synchronous: set at activation). */
+let activeViewer = MAIN;
+export const getActiveViewer = () => activeViewer;
+export function setActiveViewer(id) {
+  activeViewer = id || MAIN;
+}
+
+// ---------- per-profile documents (favorites, progress, searches) ----------
+// Each household profile has its own copy per playlist (see viewers.js).
+const DOCS = new Set(['favorites', 'progress', 'ui', 'searches']);
+const docCache = new Map(); // key -> {data, timer, file}
+const docKey = (profileId, name) => `${profileId}/${activeViewer}/${name}`;
+const docFile = (profileId, name, viewer = activeViewer) => path.join(viewerDocDir(profileDir(profileId), viewer), `${name}.json`);
 
 export async function getDoc(profileId, name) {
   if (!DOCS.has(name)) throw new Error('Unknown document');
-  const key = `${profileId}/${name}`;
+  const key = docKey(profileId, name);
   if (!docCache.has(key)) {
-    docCache.set(key, { data: await readJson(path.join(profileDir(profileId), `${name}.json`), {}), timer: null });
+    const file = docFile(profileId, name);
+    docCache.set(key, { data: await readJson(file, {}), timer: null, file });
   }
   return docCache.get(key).data;
 }
 
 /** The in-memory copy of a document, if loaded (synchronous). */
 export function peekDoc(profileId, name) {
-  return docCache.get(`${profileId}/${name}`)?.data ?? null;
+  return docCache.get(docKey(profileId, name))?.data ?? null;
 }
 
 /** Replace a document in memory and persist it (debounced). */
 export async function setDoc(profileId, name, data) {
-  const key = `${profileId}/${name}`;
+  const key = docKey(profileId, name);
   if (!docCache.has(key)) await getDoc(profileId, name); // already loaded → update synchronously
   const entry = docCache.get(key);
   entry.data = data;
   clearTimeout(entry.timer);
   entry.timer = setTimeout(() => {
     entry.timer = null;
-    writeJson(path.join(profileDir(profileId), `${name}.json`), entry.data).catch(console.error);
+    writeJson(entry.file, entry.data).catch(console.error);
   }, 500);
   return data;
 }
 
 /** Flush pending debounced writes synchronously (called on quit). */
 export function flushDocs() {
-  for (const [key, entry] of docCache) {
+  for (const entry of docCache.values()) {
     if (!entry.timer) continue;
     clearTimeout(entry.timer);
-    const [pid, name] = key.split('/');
-    writeJsonSync(path.join(profileDir(pid), `${name}.json`), entry.data);
+    writeJsonSync(entry.file, entry.data);
   }
 }

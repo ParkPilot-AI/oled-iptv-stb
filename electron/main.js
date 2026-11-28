@@ -24,6 +24,10 @@ import * as adult from './adult.js';
 import { createBluetooth } from './bluetooth.js';
 import { createGames, GFN_DOWNLOAD_URL } from './games.js';
 import { watchSignin, createSigninWindow, signinDir } from './signin.js';
+import { pipRect, mpvGeometry } from './pip.js';
+import { createPhoneLogin } from './phonelogin.js';
+import * as viewers from './viewers.js';
+import { createSyncTracker } from './sync.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -236,9 +240,44 @@ function sendMain(channel, data) {
   if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send(channel, data);
 }
 
+// While the mini-player or a trailer preview floats above the menus, the main
+// window leaves full-screen mode (same size, no border): a focused full-screen
+// window would otherwise be stacked above the always-on-top video.
+let mainWasFull = null;
+function mainWindowed(on) {
+  if (!mainWin || mainWin.isDestroyed()) return;
+  if (on) {
+    if (mainWasFull == null) mainWasFull = mainWin.isFullScreen();
+    if (mainWasFull) {
+      const b = screen.getDisplayMatching(mainWin.getBounds()).bounds;
+      mainWin.setFullScreen(false);
+      mainWin.setBounds(b);
+    }
+  } else if (mainWasFull != null) {
+    if (mainWasFull) mainWin.setFullScreen(true);
+    mainWasFull = null;
+  }
+}
+
 const player = new Player({
   resourcesPath: process.resourcesPath,
+  pipGeometry(mode) {
+    const display = mainWin ? screen.getDisplayMatching(mainWin.getBounds()) : screen.getPrimaryDisplay();
+    return mpvGeometry(pipRect(mode, display));
+  },
+  windowed(mode, item) {
+    osdWin?.hide();
+    mainWindowed(true);
+    if (mainWin) {
+      mainWin.show();
+      mainWin.focus();
+    }
+    if (psbId == null) psbId = powerSaveBlocker.start('prevent-display-sleep');
+    sendMain('player:window', { mode, item });
+  },
   showOsd() {
+    mainWindowed(false);
+    sendMain('player:window', { mode: 'full' });
     if (!osdWin) createOsdWindow();
     const display = mainWin ? screen.getDisplayMatching(mainWin.getBounds()) : screen.getPrimaryDisplay();
     osdWin.setBounds(display.bounds);
@@ -252,6 +291,7 @@ const player = new Player({
   },
   hideOsd() {
     osdWin?.hide();
+    mainWindowed(false);
     if (mainWin) {
       mainWin.show();
       mainWin.focus();
@@ -268,6 +308,22 @@ const player = new Player({
     sendMain('player:closed', summary);
   },
 });
+
+// ---------- background sync status ("Updating TV guide…") ----------
+const sync = createSyncTracker((ch, data) => sendMain(ch, data));
+catalog.setSyncTracker(sync);
+
+// ---------- sleep: stop playback and switch the picture off ----------
+const run = (cmd, args) => new Promise((resolve) => execFile(cmd, args, { timeout: 5000 }, (err) => resolve(!err)));
+async function sleepDisplay(on) {
+  if (process.platform !== 'linux' || !process.env.DISPLAY) return false;
+  if (on) return run('xset', ['dpms', 'force', 'off']);
+  await run('xset', ['dpms', 'force', 'on']);
+  return run('xset', ['-dpms']); // back to "never blank" (the app has its own screensaver)
+}
+
+// ---------- playlist sign-in from a phone (QR code on the TV) ----------
+const phoneLogin = createPhoneLogin({ onSubmit: (fields) => sendMain('phonelogin:submit', fields) });
 
 // ---------- Bluetooth controllers ----------
 const bluetooth = createBluetooth({ hasUpdater, helper: (args) => helperJson(args), openExternal: (u) => shell.openExternal(u) });
@@ -391,9 +447,60 @@ const handlers = {
     if ('audioDevice' in patch) await audio.applyOutput(patch.audioDevice);
     const s = await store.updateSettings(patch);
     if (Object.keys(patch).some((k) => LIVE_KEYS.has(k))) await player.applySettings(s);
+    if ('theme' in patch) {
+      // Each household profile keeps its own theme.
+      const db = await store.loadViewers();
+      viewers.saveViewer(db, { id: db.activeId, theme: patch.theme });
+      await store.saveViewers();
+    }
     return adult.publicSettings(s);
   },
-  'adult:show': async (arg) => adult.publicSettings(await store.updateSettings(adult.showAdultPatch(await store.getSettings(), arg || {}))),
+  'adult:show': async (arg) => {
+    if (arg?.show && (await activeViewerObj())?.kids) throw new Error('Not available on a Kids profile');
+    return adult.publicSettings(await store.updateSettings(adult.showAdultPatch(await store.getSettings(), arg || {})));
+  },
+
+  // Household profiles ("Who's watching?")
+  'viewers:list': async () => viewers.publicViewers(await store.loadViewers()),
+  'viewers:activate': async ({ id, pin } = {}) => {
+    const db = await store.loadViewers();
+    const v = viewers.checkViewerPin(db, id, pin);
+    if (db.activeId !== id && player.active) await player.stop({ reason: 'viewer' });
+    db.activeId = id;
+    await store.saveViewers();
+    store.setActiveViewer(id);
+    const s = v.theme ? await store.updateSettings({ theme: v.theme }) : await store.getSettings();
+    return { viewer: viewers.publicViewer(v), settings: adult.publicSettings(s) };
+  },
+  'viewers:save': async ({ id, name, kids, pin } = {}) => {
+    const db = await store.loadViewers();
+    viewers.assertCanManage(db, id, pin);
+    const v = viewers.saveViewer(db, { id, name, kids });
+    await store.saveViewers();
+    return viewers.publicViewer(v);
+  },
+  'viewers:pin': async ({ id, pin, current } = {}) => {
+    const db = await store.loadViewers();
+    viewers.assertCanManage(db, id, current);
+    viewers.setViewerPin(db, id, { pin, current });
+    await store.saveViewers();
+    return viewers.publicViewers(db);
+  },
+  'viewers:remove': async ({ id, pin } = {}) => {
+    const db = await store.loadViewers();
+    viewers.assertCanManage(db, id, pin);
+    viewers.removeViewer(db, id);
+    await store.saveViewers();
+    store.setActiveViewer(db.activeId);
+    return viewers.publicViewers(db);
+  },
+  'viewers:askOnStart': async ({ on } = {}) => {
+    const db = await store.loadViewers();
+    viewers.assertCanManage(db);
+    db.askOnStart = !!on;
+    await store.saveViewers();
+    return viewers.publicViewers(db);
+  },
   'adult:pin': async (arg) => adult.publicSettings(await store.updateSettings(adult.pinPatch(await store.getSettings(), arg || {}))),
   'volume:change': async ({ action }) => {
     let r = await audio.systemVolume(action).catch(() => null);
@@ -428,6 +535,15 @@ const handlers = {
   'art:get': (q) => getArtwork(q),
   'art:testKey': (key) => testTmdbKey(key),
   'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
+  'sync:status': () => ({ tasks: sync.list() }),
+  'system:sleep': async () => {
+    await player.stop({ reason: 'sleep' }); // also frees the provider connection
+    sendMain('power:sleeping', true);
+    return { screenOff: await sleepDisplay(true) };
+  },
+  'system:wake': () => sleepDisplay(false),
+  'phonelogin:start': () => phoneLogin.start(),
+  'phonelogin:stop': () => phoneLogin.stop(),
   'games:status': () => games.status(),
   'games:install': async () => {
     if (process.platform === 'win32') {
@@ -445,11 +561,11 @@ const handlers = {
   'bt:forget': ({ mac }) => bluetooth.forget(mac),
   'bt:openSystemSettings': () => bluetooth.openSystemSettings(),
   'trailer:get': async ({ item }) => ((await trailersOn()) ? trailers.get(titleItem(item)) : { available: false }),
-  'trailer:play': async ({ profileId, item, title }) => {
+  'trailer:play': async ({ profileId, item, title, mode = 'full' }) => {
     const t = await trailers.prepare(titleItem(item));
     if (!t) throw new Error('No trailer found');
     const trailer = { kind: 'trailer', id: `yt:${t.key}`, name: title || item.name, load: trailerLoad(t), from: { kind: item.kind, id: item.id } };
-    await player.play({ profileId, items: [trailer], index: 0, resume: false });
+    await player.play({ profileId, items: [trailer], index: 0, resume: false, mode: mode === 'peek' ? 'peek' : 'full' });
   },
   'discover:recs': ({ item }) => discover.getRecommendations(item),
   'art:refreshLogos': async ({ profileId }) => {
@@ -494,8 +610,14 @@ function openSignin(url) {
   signinWin = createSigninWindow(BrowserWindow, url, { onClosed: () => (signinWin = null) });
 }
 
+async function activeViewerObj() {
+  const db = await store.loadViewers();
+  return db.list.find((v) => v.id === db.activeId) || null;
+}
+
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  store.setActiveViewer((await store.loadViewers()).activeId);
   if (process.platform === 'linux' && hasUpdater()) {
     try {
       watchSignin({ dir: signinDir(), open: openSignin });
