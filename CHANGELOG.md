@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.2
+
+### Fixed
+- **Box files arrive with the update that brings them.** The updater replaces itself during an
+  update, but the old copy carried on and only installed the files it knew about — so new box
+  files (such as the GeForce NOW sign-in handler in 1.2.1) only appeared on the *next* update.
+  The old copy now hands over to the new one to finish.
+
 ## 1.2.1
 
 ### New

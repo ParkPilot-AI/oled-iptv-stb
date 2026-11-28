@@ -166,11 +166,15 @@ WORK=""
 cleanup() { [[ -n $WORK ]] && rm -rf "$WORK"; }
 trap cleanup EXIT
 
+SELF_PATH=${STB_ROOT:-}/usr/local/sbin/stb-update
+
 cmd_run() {
   exec 9>"$LOCK"
   flock -n 9 || fail "An update is already running"
   exec > >(tee -a "$LOG") 2>&1
   echo "=== $(date -Is) update started ==="
+  # Fingerprint of this copy of the helper, to spot when the app update replaces it.
+  local self_sum; self_sum=$(cksum <"${BASH_SOURCE[0]}" 2>/dev/null)
 
   say "STEP Refreshing package signing keys"
   pacman -Sy --noconfirm --needed archlinux-keyring || fail "Could not refresh package databases (network?)"
@@ -185,6 +189,13 @@ cmd_run() {
   # pacman -Su only upgrades what's installed: add packages/services/config the app
   # needs now (e.g. Bluetooth, Flatpak). Uses the list from the app just installed.
   say "STEP Checking Bluetooth and Games support"
+  if [[ -x $SELF_PATH && $(cksum <"$SELF_PATH" 2>/dev/null) != "$self_sum" ]]; then
+    # The app update just installed a newer helper: let it do the rest, so files and
+    # packages it knows about (and this copy doesn't) arrive in this same update.
+    STB_LOCK_HELD=1 "$SELF_PATH" provision-run || fail "Finishing the update failed — see $LOG"
+    say "DONE"
+    return
+  fi
   provision "$APP/stb-system" 0
   games_update # keeps GeForce NOW current with the normal 'Update system' button
 
@@ -193,6 +204,17 @@ cmd_run() {
     say "REBOOT_REQUIRED"
   fi
   say "DONE"
+}
+
+# Second half of 'run', started by an older helper that has just updated itself.
+# It still holds the lock (inherited fd 9) and its output already goes to the log.
+cmd_provision_run() {
+  [[ ${STB_LOCK_HELD:-} == 1 ]] || fail "provision-run is only for the updater itself"
+  provision "$APP/stb-system" 0
+  games_update
+  if [[ ! -d /usr/lib/modules/$(uname -r) ]]; then
+    say "REBOOT_REQUIRED"
+  fi
 }
 
 cmd_provision() {
@@ -465,6 +487,7 @@ case ${1:-} in
   games) shift; cmd_games "$@" ;;
   check) cmd_check ;;
   provision) cmd_provision ;;
+  provision-run) cmd_provision_run ;;
   run) cmd_run ;;
   reboot) systemctl reboot ;;
   poweroff) systemctl poweroff ;;
