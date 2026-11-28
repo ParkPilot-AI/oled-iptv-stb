@@ -2328,3 +2328,20 @@ small {
   flex-direction: column;
   gap: 0.9rem;
 }
+
+/* ---------- Search: quick filters and recent searches ---------- */
+.search-chips,
+.search-recent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: center;
+  margin-bottom: 1.2rem;
+}
+.search-recent .muted {
+  margin-right: 0.4rem;
+  font-size: 0.95rem;
+}
+.pill-recent {
+  font-size: 1rem;
+}

@@ -29,7 +29,8 @@ test('hints follow the focused item and name the right buttons', () => {
     hintsFor(setting).map((h) => h.key),
     ['enter', 'tabs', 'back']
   );
-  assert.ok(hintsFor(null, { docked: true }).some((h) => h.key === 'play'));
+  assert.ok(hintsFor(null, { docked: 'dock' }).some((h) => h.key === 'play'));
+  assert.ok(!hintsFor(null, { docked: 'peek' }).some((h) => h.key === 'play'));
   // Glyphs match the controller mapping: Y opens info/trailer, X plays/pauses.
   assert.equal(GLYPHS.gamepad.info, 'Y');
   assert.equal(BUTTON_KEYS[3], 'i');

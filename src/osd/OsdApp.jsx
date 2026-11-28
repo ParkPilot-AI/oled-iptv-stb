@@ -1,7 +1,7 @@
 // Transparent overlay rendered above the mpv video window. Holds keyboard
 // focus during playback, so it owns all player key bindings.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../lib/api.js';
+import { api, imgUrl } from '../lib/api.js';
 import { favTarget } from '../lib/fav.js';
 import { keyAction } from '../nav/keys.js';
 import { clock, epLabel, bitrate } from '../lib/format.js';
@@ -13,6 +13,7 @@ import { usePixelShift } from '../components/Modal.jsx';
 import { useLiveNav, SurfBanner, GlassGuide } from './LiveNav.jsx';
 import { LiveBanner, VodBar } from './Bars.jsx';
 import { startGamepadNav } from '../lib/gamepad.js';
+import { upNextShown, UP_NEXT_COUNTDOWN } from '../lib/upnext.js';
 import './osd.css';
 
 const cmd = (c) => api.invoke('player:command', c).catch(() => {});
@@ -23,6 +24,40 @@ export function channelForNumber(playlist, num) {
   const i = playlist.findIndex((c) => c.num === num);
   const j = i >= 0 ? i : num - 1;
   return j >= 0 && j < playlist.length ? playlist[j] : null;
+}
+
+/** Bottom-right "Next episode in 10 s" card with the next episode's picture and title. */
+function UpNextCard({ st, onTimeout }) {
+  const [left, setLeft] = useState(UP_NEXT_COUNTDOWN);
+  const fired = useRef(false);
+  useEffect(() => {
+    if (st.paused) return;
+    const t = setInterval(() => setLeft((n) => Math.max(0, n - 1)), 1000);
+    return () => clearInterval(t);
+  }, [st.paused]);
+  useEffect(() => {
+    if (left === 0 && !fired.current) {
+      fired.current = true;
+      onTimeout();
+    }
+  }, [left, onTimeout]);
+  const n = st.next;
+  const art = n.icon || n.seriesIcon || st.item.seriesIcon;
+  return (
+    <div className="up-next">
+      {art && <img src={imgUrl(art, 480)} alt="" />}
+      <div className="up-next-body">
+        <div className="up-next-when">{st.paused ? 'Next episode' : `Next episode in ${left} s`}</div>
+        <div className="up-next-title">
+          {epLabel(n)} {n.name || ''}
+        </div>
+        <div className="up-next-keys">
+          <kbd>OK</kbd> Play now <kbd>Back</kbd> Cancel
+        </div>
+      </div>
+      <i className="up-next-bar" style={{ width: `${(left / UP_NEXT_COUNTDOWN) * 100}%` }} />
+    </div>
+  );
 }
 
 /** "104 — BBC One HD" while typing a channel number. */
@@ -45,6 +80,7 @@ export default function OsdApp() {
   const [note, setNote] = useState(null);
   const [saver, setSaver] = useState(false);
   const [epg, setEpg] = useState(null);
+  const [upNextOff, setUpNextOff] = useState(''); // episode key whose card was dismissed
   const [now, setNow] = useState(Date.now());
   const rootRef = useRef(null);
   const stRef = useRef(null);
@@ -154,6 +190,13 @@ export default function OsdApp() {
       }
       const live = s.kind === 'live';
       const vod = !live;
+      // "Up next" card: OK plays the next episode now, Back dismisses it.
+      if (upNextShown(s, upNextOff) && (action === 'enter' || action === 'back')) {
+        if (action === 'enter') cmd({ type: 'play-next' });
+        else setUpNextOff(`${s.item.kind}:${s.item.id}`);
+        e.preventDefault?.();
+        return;
+      }
       // Trailers: no favourites, channel numbers or zapping.
       if (s.kind === 'trailer' && ['fav', 'digit', 'chUp', 'chDown', 'next', 'prev'].includes(action)) {
         e.preventDefault?.();
@@ -249,7 +292,7 @@ export default function OsdApp() {
       }
       e.preventDefault?.();
     },
-    [saver, digits, visible, showInfo, poke, flash, toggleFav]
+    [saver, digits, visible, showInfo, poke, flash, toggleFav, upNextOff]
   );
 
   // Controller buttons arrive as key events (A = OK, B = Back, D-pad = arrows).
@@ -304,6 +347,7 @@ export default function OsdApp() {
       {visible && <div className="osd-clock">{clock(now)}</div>}
       {liveNav.surf != null && <SurfBanner nav={liveNav} current={it} />}
       {liveNav.guide != null && <GlassGuide nav={liveNav} currentIndex={st.index} />}
+      {upNextShown(st, upNextOff) && <UpNextCard st={st} onTimeout={() => cmd({ type: 'play-next' })} />}
       {showBar && !liveNav.active && (st.kind === 'live' ? <LiveBanner st={st} epg={epg} now={now} /> : <VodBar st={st} />)}
       {st.paused && !visible && (
         <div className="osd-paused">

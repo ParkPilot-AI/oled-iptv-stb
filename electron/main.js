@@ -540,11 +540,11 @@ const handlers = {
   'bt:forget': ({ mac }) => bluetooth.forget(mac),
   'bt:openSystemSettings': () => bluetooth.openSystemSettings(),
   'trailer:get': async ({ item }) => ((await trailersOn()) ? trailers.get(titleItem(item)) : { available: false }),
-  'trailer:play': async ({ profileId, item, title }) => {
+  'trailer:play': async ({ profileId, item, title, mode = 'full' }) => {
     const t = await trailers.prepare(titleItem(item));
     if (!t) throw new Error('No trailer found');
     const trailer = { kind: 'trailer', id: `yt:${t.key}`, name: title || item.name, load: trailerLoad(t), from: { kind: item.kind, id: item.id } };
-    await player.play({ profileId, items: [trailer], index: 0, resume: false });
+    await player.play({ profileId, items: [trailer], index: 0, resume: false, mode: mode === 'peek' ? 'peek' : 'full' });
   },
   'discover:recs': ({ item }) => discover.getRecommendations(item),
   'art:refreshLogos': async ({ profileId }) => {

@@ -114,6 +114,47 @@ function MainApp() {
     };
   }, [setIdle]);
 
+  // Info (Y on a controller) on a film or series poster: floating trailer preview
+  // beside the grid. Info again, or Back, closes it; OK still opens the title.
+  useKeyHandler(
+    (action) => {
+      if (action !== 'info') return false;
+      const key = document.activeElement?.dataset?.fav;
+      const d = getState().docked;
+      if (d?.mode === 'peek') {
+        api.invoke('player:command', { type: 'stop' }).catch(() => {});
+        if (!key || (d.item?.from && `${d.item.from.kind}:${d.item.from.id}` === key)) return true;
+      }
+      if (!key || !/^(movie|series):/.test(key)) return false;
+      const item = favRegistry.get(key);
+      const s = getState().settings;
+      if (!item) return false;
+      if (!s?.tmdbKey || s.trailers === false) {
+        toast('Trailer previews need a TMDB key (Settings → Library)', 3500);
+        return true;
+      }
+      toast(`Loading trailer · ${item.name}`, 1800);
+      api
+        .invoke('trailer:play', {
+          profileId: getState().profileId,
+          item: { kind: item.kind, id: item.id, name: item.name, year: item.year, tmdbId: item.tmdbId },
+          title: item.name,
+          mode: 'peek',
+        })
+        .catch((e) => toast(String(e.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 3500));
+      return true;
+    },
+    { priority: -10 }
+  );
+  useBack(
+    () => {
+      if (getState().docked?.mode !== 'peek') return false;
+      api.invoke('player:command', { type: 'stop' }).catch(() => {});
+      return true;
+    },
+    { priority: 50 }
+  );
+
   // Global: F toggles favorite on the focused item.
   useKeyHandler(
     (action) => {

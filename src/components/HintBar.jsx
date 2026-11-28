@@ -10,7 +10,7 @@ import { GLYPHS, PAD_COLOURS, hintsFor } from '../lib/hints.js';
 export function HintBar() {
   const mode = useInputMode();
   const enabled = useStore((s) => s.settings?.showHints !== false);
-  const docked = useStore((s) => !!s.docked);
+  const docked = useStore((s) => s.docked?.mode || null);
   const [el, setEl] = useState(null);
   const [shown, setShown] = useState(true);
   useEffect(() => {

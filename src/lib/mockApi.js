@@ -615,11 +615,13 @@ export function createMockApi() {
       await wait(200);
       return settings.tmdbKey && settings.trailers !== false && item?.id % 3 !== 0 ? { available: true, name: 'Official Trailer' } : { available: false };
     },
-    'trailer:play': async ({ item, title }) => {
-      // Browser demo: no mpv. Simulate a short trailer and come back to the page.
-      console.info('[mock] trailer', title, item);
+    'trailer:play': async ({ item, title, mode }) => {
+      // Browser demo: no mpv. Simulate a trailer (a preview stays "open" until stopped).
+      console.info('[mock] trailer', title, item, mode);
       await wait(400);
-      setTimeout(() => emit('player:closed', { reason: 'ended', item: { kind: 'trailer', name: title } }), 1200);
+      const t = { kind: 'trailer', name: title, from: { kind: item.kind, id: item.id } };
+      if (mode === 'peek') return emit('player:window', { mode: 'peek', item: t });
+      setTimeout(() => emit('player:closed', { reason: 'ended', item: t }), 1200);
     },
     'player:play': async (args) => {
       // Browser mode cannot launch mpv: simulate a short session.
@@ -629,6 +631,7 @@ export function createMockApi() {
     },
     'player:command': (cmd) => {
       console.info('[mock] cmd', cmd);
+      if (cmd.type === 'stop' && !osdDemo) emit('player:closed', { reason: 'user', item: { kind: 'trailer' } });
       if (cmd.type === 'jump' && osdDemo) osdDemo.jump(cmd.index);
       if (cmd.type === 'zap' && osdDemo) osdDemo.jump(osdDemo.index + cmd.delta);
     },
@@ -663,7 +666,7 @@ export function createMockApi() {
       },
     };
     const episode = { kind: 'episode', id: 9, name: 'Episode 3', seriesName: 'Metro Chronicles', season: 1, episode: 3, icon: '' };
-    let pos = 1234;
+    let pos = location.hash.includes('end') ? 2678 : 1234; // #osd-vod-end: the Up next card
     const st = () => ({
       active: true,
       profileId: 'demo',
@@ -673,6 +676,7 @@ export function createMockApi() {
       item: kind === 'live' ? items[osdDemo.index] : episode,
       pos,
       dur: kind === 'live' ? 0 : 2700,
+      next: kind === 'live' ? null : { kind: 'episode', id: 10, name: 'Episode 4', seriesName: 'Metro Chronicles', season: 1, episode: 4 },
       paused: false,
       buffering: false,
       cacheSecs: 12,

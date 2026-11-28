@@ -470,6 +470,14 @@ export class Player {
         return mpv.command('add', 'volume', cmd.delta);
       case 'stop':
         return this.stop({ reason: 'user' });
+      case 'play-next': {
+        // "Up next" card: finish this episode now and start the next one.
+        if (this.state?.kind !== 'episode' || s.index + 1 >= s.items.length) return;
+        this._saveProgress({ watched: true });
+        this._markUpNext(s.items[s.index + 1]);
+        s.index++;
+        return this._loadCurrent({ resume: false });
+      }
       case 'dock':
         return this.setWindow('dock');
       case 'undock':

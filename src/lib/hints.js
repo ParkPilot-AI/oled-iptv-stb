@@ -14,13 +14,13 @@ export function hintsFor(el, { docked = false } = {}) {
   const out = [];
   if (el?.dataset?.fav) {
     out.push({ key: 'enter', label: 'Open' }, { key: 'hold', label: 'Favourite' });
-    if (/^(movie|series):/.test(el.dataset.fav)) out.push({ key: 'info', label: 'Trailer' });
+    if (/^(movie|series):/.test(el.dataset.fav)) out.push({ key: 'info', label: docked === 'peek' ? 'Close preview' : 'Trailer' });
   } else if (el?.closest?.('.settings')) {
     out.push({ key: 'enter', label: 'Change' }, { key: 'tabs', label: 'Tabs' });
   } else if (el) {
     out.push({ key: 'enter', label: 'Select' });
   }
-  if (docked) out.push({ key: 'play', label: 'Full screen' });
-  out.push({ key: 'back', label: docked ? 'Back / close player' : 'Back' });
+  if (docked === 'dock') out.push({ key: 'play', label: 'Full screen' });
+  out.push({ key: 'back', label: docked === 'peek' ? 'Close preview' : docked ? 'Back / close player' : 'Back' });
   return out;
 }
