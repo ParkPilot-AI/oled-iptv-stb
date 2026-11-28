@@ -3,6 +3,7 @@ import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile,
 import { dispatchKey, dispatchKeyUp, setLongPressHandler, useBack, useKeyHandler, keyAction } from './nav/keys.js';
 import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
 import { JobModal, useProvision } from './components/SystemUpdate.jsx';
+import { startControllerWatch } from './lib/controllers.js';
 import { api } from './lib/api.js';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';
 import { NavRail } from './components/NavRail.jsx';
@@ -95,6 +96,7 @@ function MainApp() {
       {bootState === 'catalog' && <CatalogLoading />}
       {bootState === 'ready' && <Shell />}
       {bootState === 'ready' && <ProvisionPrompt />}
+      {bootState === 'ready' && <ControllerWatch />}
       <ConfirmHost />
       <ToastHost />
       <VolumeHud />
@@ -107,6 +109,12 @@ function MainApp() {
  * Boxes upgraded to 1.2 by the 1.1 updater are missing Bluetooth/Flatpak until
  * 'stb-update provision' runs: ask once (it stays in Settings → System after that).
  */
+/** Watch controllers in the background (connect/disconnect toasts). */
+function ControllerWatch() {
+  useEffect(() => startControllerWatch(), []);
+  return null;
+}
+
 function ProvisionPrompt() {
   const settings = useStore((s) => s.settings);
   const { st, refresh } = useProvision();

@@ -21,6 +21,7 @@ import { resolveMpvBinary, resolveTool } from './mpv.js';
 import * as audio from './audio.js';
 import { userDataDir } from './paths.js';
 import * as adult from './adult.js';
+import { createBluetooth } from './bluetooth.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -251,6 +252,9 @@ const player = new Player({
   },
 });
 
+// ---------- Bluetooth controllers ----------
+const bluetooth = createBluetooth({ hasUpdater, helper: (args) => helperJson(args), openExternal: (u) => shell.openExternal(u) });
+
 // ---------- trailers ----------
 const ytdlpPath = async () => resolveTool('yt-dlp', { customPath: (await store.getSettings()).ytdlpPath, resourcesPath: process.resourcesPath });
 const trailers = createTrailers({
@@ -378,6 +382,13 @@ const handlers = {
   'art:get': (q) => getArtwork(q),
   'art:testKey': (key) => testTmdbKey(key),
   'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
+  'bt:status': () => bluetooth.status(),
+  'bt:scan': ({ seconds } = {}) => bluetooth.scan(seconds),
+  'bt:pair': ({ mac }) => bluetooth.pair(mac),
+  'bt:connect': ({ mac }) => bluetooth.connect(mac),
+  'bt:disconnect': ({ mac }) => bluetooth.disconnect(mac),
+  'bt:forget': ({ mac }) => bluetooth.forget(mac),
+  'bt:openSystemSettings': () => bluetooth.openSystemSettings(),
   'trailer:get': async ({ item }) => ((await trailersOn()) ? trailers.get(titleItem(item)) : { available: false }),
   'trailer:play': async ({ profileId, item, title }) => {
     const t = await trailers.prepare(titleItem(item));

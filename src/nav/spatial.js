@@ -11,7 +11,8 @@
 // - If the focused element disappears (virtualised list, view change), the
 //   element nearest to the last focused rectangle is recovered.
 
-const SEL = '[data-focusable]:not([data-disabled])';
+// Disabled controls (Focusable disabled → data-disabled) are never focus targets.
+export const SEL = '[data-focusable]:not([data-disabled])';
 const scopes = [];
 const memory = new Map();
 let lastRect = null;

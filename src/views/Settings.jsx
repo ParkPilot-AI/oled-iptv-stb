@@ -4,6 +4,7 @@ import { useStore, setState, getState, toast, confirmDialog, activateProfile, lo
 import { clearArtCache } from '../lib/art.js';
 import { THEMES } from '../lib/theme.js';
 import { AdultRows } from '../components/AdultSettings.jsx';
+import { ControllerSettings } from '../components/ControllerSettings.jsx';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
 import { UpdateRow } from '../components/SystemUpdate.jsx';
@@ -167,6 +168,7 @@ const TABS = [
   { id: 'picture', label: 'Picture' },
   { id: 'sound', label: 'Sound' },
   { id: 'subs', label: 'Subtitles' },
+  { id: 'controllers', label: 'Controllers' },
   { id: 'library', label: 'Library' },
   { id: 'system', label: 'System' },
 ];
@@ -287,6 +289,7 @@ export function Settings() {
         </div>
       </>
     ),
+    controllers: <ControllerSettings />,
     library: (
       <>
         <div className="settings-col" data-focus-group="settings-a" data-focus-trap="down">

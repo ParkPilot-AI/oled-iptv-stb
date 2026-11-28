@@ -131,6 +131,19 @@ export function createMockApi() {
   let settings = { overscan: 0, tmdbKey: '', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, theme: 'amber', trailers: true, audioDevice: 'auto', subMode: 'off', brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', audioLang: 'auto', audioDelayMs: 0, nightMode: 'off', passthrough: false, speakers: 'auto', artSource: 'prefer', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const bt = {
+    adapter: localStorage.getItem('mock:bt') !== 'none',
+    found: [],
+    devices: [{ mac: '98:7A:14:00:00:01', name: 'Xbox Wireless Controller', paired: true, connected: true, trusted: true, battery: 80, gamepad: true }],
+  };
+  const btStatus = () => (bt.adapter ? { adapter: true, powered: true, blocked: false, discovering: false, devices: bt.devices } : { adapter: false, powered: false, blocked: false, discovering: false, devices: [] });
+  if (typeof window !== 'undefined') {
+    window.mockBluetooth = (mode) => {
+      bt.adapter = mode !== 'none';
+      localStorage.setItem('mock:bt', bt.adapter ? 'on' : 'none');
+      return btStatus();
+    };
+  }
   const wifi = {
     status: { state: 'disconnected', ssid: '', ip: '', signal: null },
     networks: [
@@ -282,6 +295,40 @@ export function createMockApi() {
       return { started: true };
     },
     'system:reboot': () => setTimeout(() => location.reload(), 500),
+    // Bluetooth (dev console: mockBluetooth('none') for "no adapter", mockBluetooth('on') to plug one in).
+    'bt:status': () => btStatus(),
+    'bt:scan': async ({ seconds = 12 } = {}) => {
+      if (!bt.adapter) throw new Error('No Bluetooth adapter found');
+      await wait(Math.min(seconds, 4) * 1000);
+      bt.found = [
+        { mac: '98:7A:14:00:00:02', name: 'Xbox Wireless Controller', paired: false, connected: false, trusted: false, battery: null, gamepad: true },
+        { mac: 'E4:17:D8:00:00:03', name: '8BitDo Pro 2', paired: false, connected: false, trusted: false, battery: null, gamepad: true },
+        { mac: '11:22:33:44:55:66', name: 'Galaxy Buds2', paired: false, connected: false, trusted: false, battery: null, gamepad: false },
+      ];
+      return { adapter: true, devices: [...bt.found, ...bt.devices] };
+    },
+    'bt:pair': async ({ mac }) => {
+      await wait(2500);
+      const d = bt.found.find((x) => x.mac === mac);
+      if (!d || d.name.startsWith('8BitDo')) throw new Error('Controller not in pairing mode — hold the pair button until the Xbox button flashes quickly');
+      bt.devices.push({ ...d, paired: true, trusted: true, connected: true, battery: 100 });
+      return { ok: true, device: d };
+    },
+    'bt:connect': async ({ mac }) => {
+      await wait(800);
+      bt.devices = bt.devices.map((d) => (d.mac === mac ? { ...d, connected: true } : d));
+      return { ok: true };
+    },
+    'bt:disconnect': async ({ mac }) => {
+      await wait(500);
+      bt.devices = bt.devices.map((d) => (d.mac === mac ? { ...d, connected: false } : d));
+      return { ok: true };
+    },
+    'bt:forget': async ({ mac }) => {
+      bt.devices = bt.devices.filter((d) => d.mac !== mac);
+      return { ok: true };
+    },
+    'bt:openSystemSettings': () => null,
     // Provisioning (dev console: localStorage.setItem('mock:provision', 'needed'), reload).
     'system:provision:status': () => ({ available: true, needed: localStorage.getItem('mock:provision') === 'needed', missing: ['bluez-utils', 'flatpak', 'bluetooth.service'] }),
     'system:provision:run': () => {

@@ -2083,3 +2083,33 @@ small {
 .setting-row.is-static {
   color: var(--muted);
 }
+
+/* Controllers: greyed-out rows when there's no Bluetooth adapter (also skipped by focus). */
+.setting-row.is-disabled,
+.settings-reason.is-disabled {
+  opacity: 0.38;
+}
+.setting-row.is-disabled .setting-value {
+  color: var(--muted);
+}
+.settings-reason {
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  padding: 0 1.4rem 0.6rem;
+}
+.bt-modal {
+  min-width: 40rem;
+}
+.bt-steps {
+  margin: 1rem 0 1.6rem 1.4rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+.bt-sub {
+  margin: 1.2rem 0 0.4rem 1.4rem;
+  font-size: 1rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
