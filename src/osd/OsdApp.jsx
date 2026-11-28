@@ -1,18 +1,21 @@
 // Transparent overlay rendered above the mpv video window. Holds keyboard
 // focus during playback, so it owns all player key bindings.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, imgUrl } from '../lib/api.js';
+import { api } from '../lib/api.js';
+import { favTarget } from '../lib/fav.js';
 import { keyAction } from '../nav/keys.js';
-import { clock, duration, progressPct, epLabel, bitrate } from '../lib/format.js';
+import { clock, epLabel, bitrate } from '../lib/format.js';
 import { Icon } from '../components/Icons.jsx';
 import { Screensaver } from '../components/Screensaver.jsx';
 import { VolumeHud, changeVolume } from '../components/VolumeHud.jsx';
 import { applyTheme } from '../lib/theme.js';
 import { usePixelShift } from '../components/Modal.jsx';
 import { useLiveNav, SurfBanner, GlassGuide } from './LiveNav.jsx';
+import { LiveBanner, VodBar } from './Bars.jsx';
 import './osd.css';
 
 const cmd = (c) => api.invoke('player:command', c).catch(() => {});
+
 
 export default function OsdApp() {
   const [st, setSt] = useState(null);
@@ -98,13 +101,15 @@ export default function OsdApp() {
   const toggleFav = useCallback(async () => {
     const s = stRef.current;
     const it = s.item;
-    if (it.kind === 'episode') return flash('Add the series to Favourites from its page');
-    const k = it.kind === 'live' ? 'live' : 'movie';
+    const target = favTarget(it);
+    if (!target) return;
     const favs = { live: [], movie: [], series: [], ...(await api.invoke('doc:get', { profileId: s.profileId, name: 'favorites' })) };
-    const on = favs[k].some((f) => f.id === it.id);
-    favs[k] = on ? favs[k].filter((f) => f.id !== it.id) : [it, ...favs[k]];
+    const { k, item } = target;
+    const on = favs[k].some((f) => f.id === item.id);
+    favs[k] = on ? favs[k].filter((f) => f.id !== item.id) : [item, ...favs[k]];
     await api.invoke('doc:set', { profileId: s.profileId, name: 'favorites', data: favs });
-    flash(on ? 'Removed from Favourites' : 'Added to Favourites');
+    const what = k === 'series' ? ` “${item.name}”` : '';
+    flash(on ? `Removed${what} from Favourites` : `Added${what} to Favourites`);
   }, [flash]);
 
   const handle = useCallback(
@@ -176,6 +181,10 @@ export default function OsdApp() {
             clearTimeout(digitT.current);
             setDigits('');
             cmd({ type: 'jump-num', num: Number(digits) });
+          } else if (vod) {
+            // Films and episodes: OK pauses/resumes and shows the bar.
+            cmd({ type: 'toggle-pause' });
+            poke();
           } else if (visible) {
             clearTimeout(hideT.current);
             setVisible(false);
@@ -200,10 +209,10 @@ export default function OsdApp() {
           setShowInfo((v) => !v);
           break;
         case 'audio':
-          cmd({ type: 'cycle-audio' }).then(() => flash('Audio track changed'));
+          cmd({ type: 'cycle-audio' }).then((r) => flash(r?.message || 'Audio track changed'));
           break;
         case 'subs':
-          cmd({ type: 'cycle-sub' }).then(() => flash('Subtitles changed'));
+          cmd({ type: 'cycle-sub' }).then((r) => flash(r?.message || 'Subtitles changed'));
           break;
         case 'fav':
           toggleFav();
@@ -257,7 +266,7 @@ export default function OsdApp() {
       {visible && <div className="osd-clock">{clock(now)}</div>}
       {liveNav.surf != null && <SurfBanner nav={liveNav} current={it} />}
       {liveNav.guide != null && <GlassGuide nav={liveNav} currentIndex={st.index} />}
-      {showBar && !liveNav.active && (st.kind === 'live' ? LiveBanner({ st, epg }) : VodBar({ st }))}
+      {showBar && !liveNav.active && (st.kind === 'live' ? <LiveBanner st={st} epg={epg} now={now} /> : <VodBar st={st} />)}
       {st.paused && !visible && (
         <div className="osd-paused">
           <Icon name="pause" size="3rem" />
@@ -265,71 +274,6 @@ export default function OsdApp() {
       )}
     </div>
   );
-
-  function LiveBanner({ st, epg }) {
-    const n = epg?.now;
-    const nx = epg?.next;
-    return (
-      <div className="osd-banner">
-        <div className="osd-logo">{it.icon ? <img src={imgUrl(it.icon, 240)} alt="" /> : <Icon name="live" size="3rem" />}</div>
-        <div className="osd-main">
-          <div className="osd-title">
-            {it.num ? <span className="osd-num">{it.num}</span> : null}
-            {it.name}
-            <span className="osd-pos muted">
-              {st.index + 1}/{st.total}
-            </span>
-          </div>
-          {n ? (
-            <>
-              <div className="osd-now">
-                <span className="tag">NOW</span> {n.title}
-                <span className="muted">
-                  {clock(n.start)} – {clock(n.stop)}
-                </span>
-              </div>
-              <div className="progress">
-                <div style={{ width: `${progressPct(n.start, n.stop, now)}%` }} />
-              </div>
-            </>
-          ) : (
-            <div className="osd-now muted">No programme information</div>
-          )}
-          {nx && (
-            <div className="osd-next muted">
-              Next {clock(nx.start)} · {nx.title}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function VodBar({ st }) {
-    const pct = st.dur ? (st.pos / st.dur) * 100 : 0;
-    const title = it.kind === 'episode' ? it.seriesName || it.name : it.name;
-    const sub = it.kind === 'episode' ? `${epLabel(it)}${it.name ? ` · ${it.name}` : ''}` : '';
-    return (
-      <div className="osd-banner osd-vod">
-        <div className="osd-main">
-          <div className="osd-title">
-            <Icon name={st.paused ? 'pause' : 'play'} size="1.8rem" /> {title}
-          </div>
-          {sub && <div className="osd-now muted">{sub}</div>}
-          <div className="progress big">
-            <div style={{ width: `${pct}%` }} />
-          </div>
-          <div className="osd-times">
-            <span>{duration(st.pos)}</span>
-            <span className="muted">
-              {st.dur ? `-${duration(st.dur - st.pos)} · ends ${clock(Date.now() + (st.dur - st.pos) * 1000)}` : ''}
-            </span>
-            <span>{duration(st.dur)}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 }
 
 function StreamInfo({ st }) {

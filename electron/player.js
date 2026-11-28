@@ -7,6 +7,7 @@ import { Mpv, buildMpvArgs, makeIpcPath, resolveMpvBinary, INPUT_CONF } from './
 import { streamUrl } from './xtream.js';
 import { pickSubtitle, subStyleProps } from './subs.js';
 import { videoProps, audioProps } from './mpvprops.js';
+import { describeTrack } from './tracks.js';
 import { getCredentials, getSettings, getDoc, setDoc, peekDoc, dataDir } from './store.js';
 
 const PROGRESS_EVERY_MS = 10000;
@@ -350,9 +351,20 @@ export class Player {
         return this._loadCurrent({ resume: true });
       }
       case 'cycle-audio':
-        return mpv.command('cycle', 'aid');
-      case 'cycle-sub':
-        return mpv.command('cycle', 'sid');
+      case 'cycle-sub': {
+        // Returns e.g. { message: 'Audio: English · AC3 5.1 (2/3)' } for the OSD to show.
+        const type = cmd.type === 'cycle-audio' ? 'audio' : 'sub';
+        if (type === 'audio') {
+          // Step through the audio tracks only — never to "no audio".
+          const before = (await mpv.get('track-list').catch(() => [])).filter((t) => t.type === 'audio');
+          const i = before.findIndex((t) => t.selected);
+          if (before.length) await mpv.set('aid', before[(i + 1) % before.length].id);
+        } else {
+          await mpv.command('cycle', 'sid'); // includes "off"
+        }
+        const tracks = await mpv.get('track-list').catch(() => []);
+        return { message: describeTrack(tracks, type) };
+      }
       case 'volume':
         return mpv.command('add', 'volume', cmd.delta);
       case 'stop':
