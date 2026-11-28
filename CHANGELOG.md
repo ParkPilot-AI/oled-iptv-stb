@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.4
+
+### Fixed
+- **GeForce NOW ran without the graphics chip** (stuck on its splash screen; log: "Could not
+  get DRI3 device", "software renderer: llvmpipe"). The TV user wasn't in the `render` group
+  that owns the GPU's render node. The update adds it and asks for a restart.
+
 ## 1.2.3
 
 ### Fixed
