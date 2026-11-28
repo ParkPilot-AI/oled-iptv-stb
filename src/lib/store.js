@@ -155,8 +155,10 @@ export async function loadEpg(profileId, force = false) {
   try {
     const r = await api.invoke('epg:load', { profileId, force });
     setState((s) => ({ epgStatus: `${r.channels} channels with guide data`, epgVersion: s.epgVersion + 1 }));
+    return { ok: true };
   } catch (e) {
     setState({ epgStatus: `Guide unavailable: ${e.message}` });
+    return { ok: false, error: e.message };
   }
 }
 

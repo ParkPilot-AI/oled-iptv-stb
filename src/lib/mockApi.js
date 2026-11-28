@@ -311,7 +311,10 @@ export function createMockApi() {
       if (!key || key.length < 20) throw new Error('TMDB rejected the API key');
       return true;
     },
-    'art:refreshLogos': () => null,
+    'art:refreshLogos': async () => {
+      await wait(1500);
+      return { hits: 8123, total: 10000 };
+    },
     'doc:get': ({ profileId, name }) => ls.get(`${profileId}:${name}`, {}),
     'doc:set': ({ profileId, name, data }) => ls.set(`${profileId}:${name}`, data),
     'player:play': async (args) => {

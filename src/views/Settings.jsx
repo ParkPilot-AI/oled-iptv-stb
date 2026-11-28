@@ -119,6 +119,38 @@ function Slider({ label, k, settings, update, min = -50, max = 50, step = 5, for
   );
 }
 
+/** A read-only line (not focusable): version numbers and the like. */
+function InfoRow({ label, value }) {
+  return (
+    <div className="setting-row is-static">
+      <span>{label}</span>
+      {value && <span className="setting-value muted">{value}</span>}
+    </div>
+  );
+}
+
+const cleanErr = (e) => String(e?.message || e || '').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+
+/** Runs a slow job once: repeat presses are ignored until it finishes. */
+function useJob() {
+  const [busy, setBusy] = useState({});
+  const running = useRef(new Set());
+  const run = async (name, fn) => {
+    if (running.current.has(name)) return;
+    running.current.add(name);
+    setBusy((b) => ({ ...b, [name]: true }));
+    try {
+      await fn();
+    } catch (e) {
+      toast(cleanErr(e) || 'Something went wrong', 5000);
+    } finally {
+      running.current.delete(name);
+      setBusy((b) => ({ ...b, [name]: false }));
+    }
+  };
+  return { busy, run };
+}
+
 function Action({ label, value, onSelect, danger }) {
   return (
     <Focusable className={`setting-row ${danger ? 'is-danger' : ''}`} onSelect={onSelect}>
@@ -177,6 +209,7 @@ export function Settings() {
     }
   };
   const profile = profiles.list.find((p) => p.id === pid);
+  const job = useJob();
   const C = (label, k) => <Cycle label={label} k={k} settings={settings} update={update} />;
   const ms = (v) => (v === 0 ? 'In sync' : `${v > 0 ? '+' : ''}${v} ms`);
 
@@ -262,16 +295,30 @@ export function Settings() {
             value={catalog ? `Updated ${new Date(catalog.fetchedAt).toLocaleString()}` : ''}
             onSelect={() => activateProfile(pid, { force: true })}
           />
-          <Action label="Refresh TV guide now" value={epgStatus} onSelect={() => loadEpg(pid, true).then(() => toast('Guide refreshed'))} />
+          <Action
+            label="Refresh TV guide now"
+            value={job.busy.epg ? 'Refreshing…' : epgStatus}
+            onSelect={() =>
+              job.run('epg', async () => {
+                const r = await loadEpg(pid, true);
+                if (!r.ok) throw new Error(`Guide refresh failed: ${r.error}`);
+                toast('Guide refreshed');
+              })
+            }
+          />
           {C('Auto-refresh library', 'catalogTtlHours')}
           {C('Auto-refresh guide', 'epgTtlHours')}
           <Action
             label="Clear cached data & images"
-            onSelect={async () => {
-              if (!(await confirmDialog({ title: 'Clear caches?', message: 'Channel lists, guide data and posters will be downloaded again.', confirmLabel: 'Clear', danger: true }))) return;
-              await api.invoke('cache:clear', { profileId: pid });
-              activateProfile(getState().profileId, { force: true });
-            }}
+            value={job.busy.clear ? 'Clearing…' : ''}
+            onSelect={() =>
+              job.run('clear', async () => {
+                if (!(await confirmDialog({ title: 'Clear caches?', message: 'Channel lists, guide data and posters will be downloaded again.', confirmLabel: 'Clear', danger: true }))) return;
+                toast('Clearing…');
+                await api.invoke('cache:clear', { profileId: pid });
+                activateProfile(getState().profileId, { force: true });
+              })
+            }
           />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
@@ -281,10 +328,15 @@ export function Settings() {
           {C('Channel logos', 'logoSource')}
           <Action
             label="Re-match channel logos now"
-            onSelect={() => {
-              toast('Matching channel logos…');
-              api.invoke('art:refreshLogos', { profileId: pid }).then(() => toast('Channel logos updated'));
-            }}
+            value={job.busy.logos ? 'Matching…' : ''}
+            onSelect={() =>
+              job.run('logos', async () => {
+                toast('Matching channel logos…');
+                const r = await api.invoke('art:refreshLogos', { profileId: pid });
+                if (!r) throw new Error("Couldn't update channel logos (check the connection)");
+                toast(`Channel logos updated · ${r.hits.toLocaleString()} of ${r.total.toLocaleString()} matched`);
+              })
+            }
           />
           <p className="credits-note">
             Movie and TV artwork from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Channel logos from tv-logo/tv-logos (github.com/tv-logo/tv-logos, for personal use) and the iptv-org open database.
@@ -307,9 +359,9 @@ export function Settings() {
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
           <h2>About ONYX</h2>
-          <Action label="Version" value={info ? `${info.version}${info.build ? ` · build ${info.build}` : ''} · ${info.platform}` : ''} onSelect={() => {}} />
-          <Action label="mpv" value={info?.mpvPath || 'Not found — see README'} onSelect={() => {}} />
-          <Action label="Credential storage" value={profiles.secureStorage ? 'OS keystore (encrypted)' : 'Obfuscated (no keystore)'} onSelect={() => {}} />
+          <InfoRow label="Version" value={info ? `${info.version}${info.build ? ` · build ${info.build}` : ''} · ${info.platform}` : ''} />
+          <InfoRow label="mpv" value={info?.mpvPath || 'Not found — see README'} />
+          <InfoRow label="Credential storage" value={profiles.secureStorage ? 'OS keystore (encrypted)' : 'Obfuscated (no keystore)'} />
         </div>
       </>
     ),

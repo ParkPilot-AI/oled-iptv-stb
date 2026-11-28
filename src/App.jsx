@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff } from './lib/store.js';
-import { dispatchKey, useBack, useKeyHandler, keyAction } from './nav/keys.js';
+import { dispatchKey, dispatchKeyUp, setLongPressHandler, useBack, useKeyHandler, keyAction } from './nav/keys.js';
 import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';
 import { NavRail } from './components/NavRail.jsx';
@@ -60,8 +60,19 @@ function MainApp() {
       }
       dispatchKey(e);
     };
+    const onKeyUp = (e) => !idleRef.current && dispatchKeyUp(e);
+    // Hold OK on a card → add/remove Favourites (no F key needed on a remote).
+    setLongPressHandler((el) => {
+      const item = favRegistry.get(el.dataset.fav);
+      if (item) toggleFavorite(item);
+    });
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+      setLongPressHandler(null);
+    };
   }, [setIdle]);
 
   // Global: F toggles favorite on the focused item.

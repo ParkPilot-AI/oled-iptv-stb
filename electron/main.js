@@ -339,7 +339,10 @@ const handlers = {
   'art:testKey': (key) => testTmdbKey(key),
   'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
   'discover:recs': ({ item }) => discover.getRecommendations(item),
-  'art:refreshLogos': ({ profileId }) => catalog.refreshLogos(profileId, sendMain, { force: true }),
+  'art:refreshLogos': async ({ profileId }) => {
+    if ((await store.getSettings()).logoSource === 'off') throw new Error('Channel logos are set to "Provider logos only"');
+    return catalog.refreshLogos(profileId, sendMain, { force: true });
+  },
   'doc:get': ({ profileId, name }) => store.getDoc(profileId, name),
   'doc:set': ({ profileId, name, data }) => store.setDoc(profileId, name, data),
 

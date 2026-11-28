@@ -273,7 +273,7 @@ export function LiveTV() {
 
       <div className="guide-grid" ref={gridRef} data-focus-group="live-grid">
         {channels.length === 0 && (
-          <p className="empty big">{catId === '__fav' ? 'Press F on any channel to add it to Favourites.' : 'No channels'}</p>
+          <p className="empty big">{catId === '__fav' ? 'Hold OK (or press F) on any channel to add it to Favourites.' : 'No channels'}</p>
         )}
         {shown.map((ch, i) => (
           <GuideRow

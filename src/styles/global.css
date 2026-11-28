@@ -2079,3 +2079,7 @@ small {
   width: auto;
   min-width: 26rem;
 }
+
+.setting-row.is-static {
+  color: var(--muted);
+}
