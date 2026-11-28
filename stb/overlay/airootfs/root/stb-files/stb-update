@@ -2,7 +2,12 @@
 # ONYX set-top box updater (runs as root via a narrow sudoers rule).
 #   stb-update check   → one JSON line: pending system updates + app versions
 #   stb-update run     → update Arch packages, then the app; progress on stdout
+#   stb-update provision → install packages/services/config added since the box was
+#                      set up (Bluetooth, Games); quick no-op when nothing is missing
 #   stb-update reboot  → reboot the box
+#   stb-update games status|install|update → GeForce NOW Flatpak (status is JSON,
+#                      install/update print '@@' progress)
+#   stb-update bt status|scan [secs]|pair|connect|disconnect|forget <mac> → JSON
 #   stb-update wifi status|scan|connect <ssid>|forget <ssid>
 #                      → JSON; connect reads the passphrase from stdin
 # Progress protocol: lines starting with "@@ " are machine-readable
@@ -55,19 +60,62 @@ cmd_check() {
     '{system: $system, appInstalled: $installed, appLatest: $latest, repo: $repo, hasToken: $token}'
 }
 
-# Keep the box's own helpers in step with the app (shipped in the app package).
+# Keep the box's own helpers and config in step with the app (shipped in the app
+# package as stb-system/).
+KIOSK_USER=${STB_KIOSK_USER:-tv}
 install_system_files() {
   local src=$1
   [[ -d $src ]] || return 0
   local p="${STB_ROOT:-}" # test hook: install under a fake root
-  put() { # atomic replace, so a running copy of this script keeps working
-    [[ -f $1 ]] || return 0
-    cmp -s "$1" "$p$2" && return 0
+  # put <file> <dest> <mode>: atomic replace (a running copy of this script keeps
+  # working). Returns 0 only when the file changed.
+  put() {
+    [[ -f $1 ]] || return 1
+    cmp -s "$1" "$p$2" && return 1
     install -D -m "$3" "$1" "$p$2.new" && mv -f "$p$2.new" "$p$2"
   }
   put "$src/stb-update" /usr/local/sbin/stb-update 755
   put "$src/stb-audio.sh" /usr/local/bin/stb-audio 755
   put "$src/nm-stb.conf" /etc/NetworkManager/conf.d/stb.conf 644
+  put "$src/portals.conf" /etc/xdg-desktop-portal/portals.conf 644
+  if put "$src/bluetooth-main.conf" /etc/bluetooth/main.conf 644; then
+    # Only when the config changed (restarting drops connected controllers).
+    systemctl try-restart bluetooth.service >/dev/null 2>&1 || true
+  fi
+  local home; home=$(getent passwd "$KIOSK_USER" | cut -d: -f6); home=${home:-/home/$KIOSK_USER}
+  if put "$src/openbox-rc.xml" "$home/.config/openbox/rc.xml" 644; then
+    chown -R "$KIOSK_USER:$KIOSK_USER" "$p$home/.config/openbox" 2>/dev/null || true
+    runuser -u "$KIOSK_USER" -- env DISPLAY=:0 openbox --reconfigure >/dev/null 2>&1 || true
+  fi
+  return 0
+}
+
+# Packages listed in packages.txt (comments and blank lines stripped), one per line.
+list_packages() { [[ -f $1 ]] && sed 's/#.*//' "$1" | tr -s ' \t' '\n' | grep -v '^$'; }
+
+# Make sure every package, service and config file the current app needs is
+# present. sync=1: the package databases may be stale, so upgrade with the install
+# (never a partial upgrade). Quick no-op when nothing is missing.
+provision() {
+  local src=$1 sync=${2:-0}
+  local -a pkgs missing
+  mapfile -t pkgs < <(list_packages "$src/packages.txt")
+  if ((${#pkgs[@]})); then
+    mapfile -t missing < <(pacman -T "${pkgs[@]}" 2>/dev/null)
+    if ((${#missing[@]})); then
+      say "STEP Installing ${#missing[@]} new package(s): ${missing[*]}"
+      if ((sync)); then
+        pacman -Syu --needed --noconfirm "${pkgs[@]}" || fail "Installing packages failed — see $LOG"
+      else
+        pacman -S --needed --noconfirm "${pkgs[@]}" || fail "Installing packages failed — see $LOG"
+      fi
+    fi
+  fi
+  install_system_files "$src"
+  if ! systemctl is-enabled bluetooth.service >/dev/null 2>&1 || ! systemctl is-active bluetooth.service >/dev/null 2>&1; then
+    say "STEP Starting Bluetooth"
+    systemctl enable --now bluetooth.service >/dev/null 2>&1 || true
+  fi
 }
 
 update_app() {
@@ -121,10 +169,26 @@ cmd_run() {
 
   update_app
 
+  # pacman -Su only upgrades what's installed: add packages/services/config the app
+  # needs now (e.g. Bluetooth, Flatpak). Uses the list from the app just installed.
+  say "STEP Checking Bluetooth and Games support"
+  provision "$APP/stb-system" 0
+  games_update # keeps GeForce NOW current with the normal 'Update system' button
+
   # The running kernel's modules are removed when a new kernel is installed.
   if [[ ! -d /usr/lib/modules/$(uname -r) ]]; then
     say "REBOOT_REQUIRED"
   fi
+  say "DONE"
+}
+
+cmd_provision() {
+  exec 9>"$LOCK"
+  flock -n 9 || fail "An update is already running"
+  exec > >(tee -a "$LOG") 2>&1
+  echo "=== $(date -Is) provision started ==="
+  say "STEP Checking Bluetooth and Games support"
+  provision "$APP/stb-system" 1
   say "DONE"
 }
 
@@ -196,11 +260,200 @@ cmd_wifi() {
   esac
 }
 
+# ---------------------------------------------------------------- Bluetooth
+# Game controllers via BlueZ (bluetoothctl, non-interactive). Every command prints
+# one JSON line. MAC addresses are validated before they reach any command.
+BT_SYS=${STB_BT_SYS:-/sys/class/bluetooth}
+BT_GAMEPAD_RE='xbox|dualsense|dualshock|wireless controller|pro controller|8bitdo'
+
+btctl() { timeout "${2:-10}" bluetoothctl $1 2>/dev/null; } # btctl "<args>" [seconds]
+
+valid_mac() { [[ $1 =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]]; }
+
+bt_has_adapter() {
+  compgen -G "$BT_SYS/hci*" >/dev/null || return 1
+  systemctl is-active --quiet bluetooth.service 2>/dev/null || pgrep -x bluetoothd >/dev/null 2>&1 || return 1
+  # (not grep -q: with pipefail, closing the pipe early would count as a failure)
+  [[ $(btctl show) == *Controller\ * ]]
+}
+
+# One device as JSON, from `bluetoothctl info <mac>`.
+bt_device() {
+  local mac=$1 info name icon
+  info=$(btctl "info $mac")
+  name=$(sed -n 's/^[[:space:]]*Name: //p' <<<"$info" | head -n1)
+  [[ -z $name ]] && name=$(sed -n 's/^[[:space:]]*Alias: //p' <<<"$info" | head -n1)
+  icon=$(sed -n 's/^[[:space:]]*Icon: //p' <<<"$info" | head -n1)
+  jq -cn --arg mac "${mac^^}" --arg name "${name:-$mac}" --arg icon "$icon" --arg re "$BT_GAMEPAD_RE" \
+    --arg paired "$(sed -n 's/^[[:space:]]*Paired: //p' <<<"$info" | head -n1)" \
+    --arg connected "$(sed -n 's/^[[:space:]]*Connected: //p' <<<"$info" | head -n1)" \
+    --arg trusted "$(sed -n 's/^[[:space:]]*Trusted: //p' <<<"$info" | head -n1)" \
+    --arg battery "$(sed -n 's/^[[:space:]]*Battery Percentage: .*(\([0-9]*\)).*/\1/p' <<<"$info" | head -n1)" \
+    '{mac: $mac, name: $name, paired: ($paired == "yes"), connected: ($connected == "yes"), trusted: ($trusted == "yes"),
+      battery: ($battery | tonumber? // null),
+      gamepad: ($icon == "input-gaming" or ($name | test($re; "i")))}'
+}
+
+# Devices as a JSON array: all known ones, or only paired (arg "paired").
+bt_devices() {
+  local filter=${1:-} line mac
+  local -a devs=()
+  while IFS= read -r line; do
+    mac=$(awk '{print $2}' <<<"$line")
+    valid_mac "$mac" || continue
+    devs+=("$(bt_device "$mac")")
+  done < <(btctl devices | grep '^Device ')
+  ((${#devs[@]})) || { echo '[]'; return; }
+  printf '%s\n' "${devs[@]}" | jq -cs --arg f "$filter" 'map(select(. != null)) | if $f == "paired" then map(select(.paired)) else . end'
+}
+
+bt_status() {
+  if ! bt_has_adapter; then
+    jq -cn '{adapter: false, powered: false, blocked: false, discovering: false, devices: []}'
+    return 0
+  fi
+  local rf blocked=false show
+  rf=$(rfkill list bluetooth 2>/dev/null)
+  if grep -q 'Hard blocked: yes' <<<"$rf"; then
+    blocked=true
+  elif grep -q 'Soft blocked: yes' <<<"$rf"; then
+    rfkill unblock bluetooth >/dev/null 2>&1 || true
+    sleep 1
+  fi
+  show=$(btctl show)
+  if [[ $blocked == false ]] && grep -q 'Powered: no' <<<"$show"; then
+    btctl "power on" >/dev/null
+    show=$(btctl show)
+  fi
+  jq -cn --argjson blocked "$blocked" --argjson devices "$(bt_devices paired)" \
+    --arg powered "$(sed -n 's/^[[:space:]]*Powered: //p' <<<"$show" | head -n1)" \
+    --arg disc "$(sed -n 's/^[[:space:]]*Discovering: //p' <<<"$show" | head -n1)" \
+    '{adapter: true, powered: ($powered == "yes"), blocked: $blocked, discovering: ($disc == "yes"), devices: $devices}'
+}
+
+# Plain-English reason for a failed pair/connect.
+bt_error() {
+  local msg=$1
+  case $msg in
+    *"not available"* | *ConnectionAttemptFailed* | *"Page Timeout"* | *"timed out"* | *Timeout* | "")
+      echo "Controller not in pairing mode — hold the pair button until the Xbox button flashes quickly" ;;
+    *AuthenticationFailed* | *AuthenticationRejected* | *AuthenticationCanceled*)
+      echo "The controller refused to pair — switch it off and on, then try again" ;;
+    *"Not Powered"* | *NotReady*) echo "Bluetooth is off" ;;
+    *InProgress*) echo "Already pairing — wait a moment and try again" ;;
+    *) echo "Couldn't pair: $(grep -o 'org.bluez.Error.[A-Za-z]*\|Failed[^.]*' <<<"$msg" | head -n1)" ;;
+  esac
+}
+
+cmd_bt() {
+  local sub=${1:-} mac=${2:-}
+  if [[ $sub != status && $sub != scan ]]; then
+    valid_mac "$mac" || { jq -cn '{ok: false, error: "Invalid controller address"}'; return 1; }
+    mac=${mac^^}
+  fi
+  if [[ $sub != status ]] && ! bt_has_adapter; then
+    jq -cn '{ok: false, adapter: false, error: "No Bluetooth adapter found"}'
+    return 1
+  fi
+  case $sub in
+    status) bt_status ;;
+    scan)
+      local secs=${2:-12}
+      [[ $secs =~ ^[0-9]+$ ]] || secs=12
+      ((secs < 3)) && secs=3
+      ((secs > 30)) && secs=30
+      btctl "--timeout $secs scan on" $((secs + 5)) >/dev/null
+      # Not-yet-paired controllers first, then other new devices, then known ones.
+      jq -cn --argjson d "$(bt_devices)" '{adapter: true, devices: ($d | sort_by([.paired, (.gamepad | not), .name]))}' ;;
+    pair)
+      local out
+      # Keep discovery running while pairing: LE controllers only answer while scanned.
+      btctl "--timeout 40 scan on" 45 >/dev/null &
+      local scan_pid=$!
+      out=$(btctl "--timeout 30 pair $mac" 35)
+      if ! grep -q 'Pairing successful\|AlreadyExists' <<<"$out"; then
+        kill "$scan_pid" 2>/dev/null
+        jq -cn --arg e "$(bt_error "$out")" '{ok: false, error: $e}'
+        return 1
+      fi
+      btctl "trust $mac" >/dev/null
+      out=$(btctl "--timeout 15 connect $mac" 20)
+      kill "$scan_pid" 2>/dev/null
+      btctl "scan off" >/dev/null
+      if grep -q 'Connection successful' <<<"$out"; then jq -cn --argjson d "$(bt_device "$mac")" '{ok: true, device: $d}'
+      else jq -cn --argjson d "$(bt_device "$mac")" '{ok: true, device: $d, warning: "Paired. Press the Xbox button to connect."}'; fi ;;
+    connect)
+      local out; out=$(btctl "--timeout 15 connect $mac" 20)
+      if grep -q 'Connection successful' <<<"$out"; then jq -cn --argjson d "$(bt_device "$mac")" '{ok: true, device: $d}'
+      else jq -cn '{ok: false, error: "Couldn'"'"'t connect — switch the controller on (press the Xbox button) and try again"}'; return 1; fi ;;
+    disconnect)
+      btctl "disconnect $mac" >/dev/null
+      jq -cn --argjson d "$(bt_device "$mac")" '{ok: true, device: $d}' ;;
+    forget)
+      btctl "remove $mac" >/dev/null
+      jq -cn '{ok: true}' ;;
+    *) jq -cn '{ok: false, error: "usage: bt status|scan [secs]|pair|connect|disconnect|forget <mac>"}'; return 2 ;;
+  esac
+}
+
+# ---------------------------------------------------------------- Games (GeForce NOW)
+# NVIDIA's official GeForce NOW app for Linux is a Flatpak from NVIDIA's own repo
+# (not Flathub); its runtime (org.freedesktop.Platform) comes from Flathub.
+# Source: NVIDIA's Linux install commands, as documented on the Arch Wiki
+# (https://wiki.archlinux.org/title/NVIDIA_GeForce_NOW) and NVIDIA's system
+# requirements page (https://www.nvidia.com/en-us/geforce-now/system-reqs/).
+GFN_REMOTE=GeForceNOW
+GFN_REPO_URL=https://international.download.nvidia.com/GFNLinux/flatpak/geforcenow.flatpakrepo
+GFN_APP_ID=com.nvidia.geforcenow
+FLATHUB_URL=https://dl.flathub.org/repo/flathub.flatpakrepo
+
+gfn_version() { flatpak info --system "$GFN_APP_ID" 2>/dev/null | sed -n 's/^[[:space:]]*Version:[[:space:]]*//p' | head -n1; }
+gfn_installed() { flatpak info --system "$GFN_APP_ID" >/dev/null 2>&1; }
+
+games_update() {
+  command -v flatpak >/dev/null 2>&1 && gfn_installed || return 0
+  say "STEP Updating GeForce NOW"
+  flatpak update -y --noninteractive --system "$GFN_APP_ID" || say "STEP GeForce NOW update failed — will retry next time"
+}
+
+cmd_games() {
+  case ${1:-} in
+    status)
+      if ! command -v flatpak >/dev/null 2>&1; then
+        jq -cn '{installed: false, version: null, flatpak: false}'
+      else
+        jq -cn --arg v "$(gfn_version)" --argjson i "$(gfn_installed && echo true || echo false)" '{installed: $i, version: (if $v == "" then null else $v end), flatpak: true}'
+      fi ;;
+    install)
+      exec 9>"$LOCK"
+      flock -n 9 || fail "An update is already running"
+      exec > >(tee -a "$LOG") 2>&1
+      echo "=== $(date -Is) GeForce NOW install started ==="
+      command -v flatpak >/dev/null 2>&1 || fail "Flatpak isn't installed yet — run 'Finish installing the update' first"
+      say "STEP Adding NVIDIA's GeForce NOW repository"
+      flatpak remote-add --system --if-not-exists flathub "$FLATHUB_URL" || fail "Couldn't add Flathub (network?)"
+      flatpak remote-add --system --if-not-exists "$GFN_REMOTE" "$GFN_REPO_URL" || fail "Couldn't add NVIDIA's repository (network?)"
+      say "STEP Downloading and installing GeForce NOW (this can take a few minutes)"
+      flatpak install -y --noninteractive --system "$GFN_REMOTE" "$GFN_APP_ID" || fail "GeForce NOW install failed — see $LOG"
+      say "STEP Installed GeForce NOW $(gfn_version)"
+      say "DONE" ;;
+    update)
+      exec 9>"$LOCK"
+      flock -n 9 || fail "An update is already running"
+      games_update
+      say "DONE" ;;
+    *) echo '{"error":"usage: games status|install|update"}'; return 2 ;;
+  esac
+}
+
 case ${1:-} in
   wifi) shift; cmd_wifi "$@" ;;
+  bt) shift; cmd_bt "$@" ;;
+  games) shift; cmd_games "$@" ;;
   check) cmd_check ;;
+  provision) cmd_provision ;;
   run) cmd_run ;;
   reboot) systemctl reboot ;;
   poweroff) systemctl poweroff ;;
-  *) echo "usage: stb-update check|run|reboot|poweroff|wifi ..." >&2; exit 2 ;;
+  *) echo "usage: stb-update check|run|provision|reboot|poweroff|wifi ...|bt ...|games status|install|update" >&2; exit 2 ;;
 esac

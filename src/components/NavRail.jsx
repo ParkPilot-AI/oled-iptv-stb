@@ -3,12 +3,14 @@ import { useRef, useState } from 'react';
 import { Focusable } from './Focusable.jsx';
 import { Icon } from './Icons.jsx';
 import { focusFirst } from '../nav/spatial.js';
+import { useStore } from '../lib/store.js';
 
 export const SECTIONS = [
   { id: 'home', label: 'Home', icon: 'home' },
   { id: 'live', label: 'Live TV', icon: 'live' },
   { id: 'movies', label: 'Movies', icon: 'movie' },
   { id: 'series', label: 'TV Shows', icon: 'series' },
+  { id: 'games', label: 'Games', icon: 'gamepad', optional: 'showGames' },
   { id: 'favorites', label: 'Favourites', icon: 'star' },
   { id: 'search', label: 'Search', icon: 'search' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
@@ -18,6 +20,7 @@ export const SECTIONS = [
 export function NavRail({ section, onSelect }) {
   const ref = useRef(null);
   const [open, setOpen] = useState(false);
+  const settings = useStore((s) => s.settings);
   return (
     <nav
       ref={ref}
@@ -32,7 +35,7 @@ export function NavRail({ section, onSelect }) {
         <Mark className="rail-mark" height="1.5rem" />
         <Wordmark className="rail-label" height="1.5rem" />
       </div>
-      {SECTIONS.map((s) => (
+      {SECTIONS.filter((s) => !s.optional || settings?.[s.optional]).map((s) => (
         <Focusable
           key={s.id}
           focusKey={`rail-${s.id}`}

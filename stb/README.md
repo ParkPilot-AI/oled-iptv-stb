@@ -63,6 +63,8 @@ If anything fails, the error is shown along with the log at `/root/stb-install.l
 | Logs | `/tmp/oled-iptv.log` (app), `/tmp/xsession.log` (X) |
 | Update everything | **Settings → System → Update system**. One button updates the Arch packages (`pacman -Syu`) and the ONYX app (from the newest GitHub release, checksum-verified, old version kept in `/opt/oled-iptv.old`). The app then restarts; a reboot is offered if a new kernel was installed. Log: `/var/log/stb-update.log` |
 | Check hardware decoding | Press **I** while playing. *HW decoding* should say `vaapi` |
+| Pair a controller | **Settings → Controllers → Pair a controller**. (Shell: `bluetoothctl`.) |
+| Games | **Settings → General → Show Games in sidebar**, then **Games → Install GeForce NOW**. Stuck in a game? **Ctrl+Alt+Home** |
 
 ## 5. USB Wi-Fi adapters
 
@@ -74,11 +76,28 @@ Small Realtek USB dongles such as the **TP-Link TL-WN725N** (RTL8188EUS, `rtl8xx
 
 Plug the dongle in **before** booting the installer. Scans can take up to 20 s.
 
-## 6. One-button updates
+## 6. Bluetooth controllers and Games
+
+**Packages** (in `packages.txt`, so they're in the offline installer repo too): `bluez`, `bluez-utils`, `flatpak` and `xdg-desktop-portal-gtk` (Flatpak pulls in `xdg-desktop-portal`, which needs a backend; `/etc/xdg-desktop-portal/portals.conf` selects gtk). Controller drivers are in the stock kernel: `xpad` (Xbox USB), `hid-microsoft`/`hid-playstation`/`hid-nintendo` and BlueZ's HID input for Bluetooth pads. Adapter firmware comes from `linux-firmware` (Intel `ibt-*`, Realtek `rtl_bt/*`, MediaTek, Qualcomm/Atheros).
+
+**Service:** `bluetooth.service` is enabled. **BlueZ config:** `/etc/bluetooth/main.conf` is replaced with ours (BlueZ has no `main.conf.d` drop-ins): dual mode, fast reconnect, *JustWorksRepairing = always* (controllers that lost their pairing can re-pair), device privacy, and adapters power on automatically.
+
+**Root actions** all go through `stb-update` (the only command `tv` may run with sudo):
+* `stb-update bt status|scan|pair|connect|disconnect|forget <MAC>` — JSON out; MAC addresses must match `XX:XX:XX:XX:XX:XX` (hex) before they reach `bluetoothctl`.
+* `stb-update games status|install|update` — adds Flathub (for the runtime) and NVIDIA's `GeForceNOW` remote (`https://international.download.nvidia.com/GFNLinux/flatpak/geforcenow.flatpakrepo`), and installs `com.nvidia.geforcenow` system-wide. `stb-update run` updates it when installed.
+* `stb-update provision` — installs anything in `packages.txt` that's missing, refreshes the box config files and enables `bluetooth.service`.
+
+**Existing boxes.** `stb-update run` provisions automatically, *but* the update that brings 1.2.0 is performed by the old helper, which doesn't know how. So after that first update ONYX asks once — and **Settings → System** shows **Finish installing the update** until it's done — which runs `stb-update provision` (a full `pacman -Syu --needed` with the new packages). Later updates need nothing extra.
+
+GeForce NOW runs under openbox as a normal X11 window (WM_CLASS `GeForceNOW`), forced full screen and undecorated. Openbox binds **Ctrl+Alt+Home** and **XF86HomePage** to `flatpak kill com.nvidia.geforcenow` as an emergency exit; ONYX comes back on its own. It needs working Vulkan Video H.264/H.265 decoding from Mesa on Intel/AMD graphics.
+
+**Optional follow-ups, not included:** `xpadneo` (better Xbox One/Series Bluetooth support: rumble, battery, button maps) is a DKMS module, so it isn't installed — the stock driver is enough for GeForce NOW. The Xbox Wireless USB dongle (`xone`) is out of scope; use Bluetooth or a USB cable.
+
+## 7. One-button updates
 
 The installer sets up three things:
 
-* `/usr/local/sbin/stb-update` — a small root helper (`check`, `run`, `reboot`).
+* `/usr/local/sbin/stb-update` — a small root helper (`check`, `run`, `provision`, `reboot`, `poweroff`, `wifi …`, `bt …`, `games …`).
 * `/etc/sudoers.d/20-stb-update` — lets the `tv` user run **only** that helper as root, without a password.
 * `/etc/stb/update.conf` — where app builds come from: `REPO="owner/repo"`, and `GITHUB_TOKEN=""` if the repo is private. Use a fine-grained token with *Contents: read-only* on that one repo.
 
@@ -92,6 +111,6 @@ echo 'tv ALL=(root) NOPASSWD: /usr/local/sbin/stb-update' | sudo tee /etc/sudoer
 printf 'REPO="ParkPilot-AI/oled-iptv-stb"\nGITHUB_TOKEN="<token>"\n' | sudo install -Dm600 /dev/stdin /etc/stb/update.conf
 ```
 
-## 7. Status
+## 8. Status
 
 The scripts pass lint checks and the app build steps are the same ones I tested elsewhere. **The ISO build and the install itself have not been run yet**, because Arch package mirrors aren't reachable from the environment where this kit was written. Expect to need a small fix or two on first use. The log file shows exactly where anything stopped.

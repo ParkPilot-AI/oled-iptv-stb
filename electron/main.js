@@ -21,14 +21,24 @@ import { resolveMpvBinary, resolveTool } from './mpv.js';
 import * as audio from './audio.js';
 import { userDataDir } from './paths.js';
 import * as adult from './adult.js';
+import { createBluetooth } from './bluetooth.js';
+import { createGames, GFN_DOWNLOAD_URL } from './games.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
 // Settings that change what's playing right now.
 const LIVE_KEYS = new Set([
-  'audioDevice', 'subMode', 'subLang', 'subSize', 'subBackground',
+  'audioDevice',
+  'subMode',
+  'subLang',
+  'subSize',
+  'subBackground',
   ...Object.keys(PICTURE_DEFAULTS),
-  'audioDelayMs', 'nightMode', 'passthrough', 'speakers', 'audioLang',
+  'audioDelayMs',
+  'nightMode',
+  'passthrough',
+  'speakers',
+  'audioLang',
 ]);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -125,7 +135,14 @@ function checkUpdates() {
   return new Promise((resolve) => {
     if (!hasUpdater()) return resolve({ available: false });
     execFile('sudo', ['-n', UPDATER, 'check'], { timeout: 90000 }, (err, out, errOut) => {
-      if (err) return resolve({ available: true, error: String(errOut || err.message).trim().split('\n').pop() });
+      if (err)
+        return resolve({
+          available: true,
+          error: String(errOut || err.message)
+            .trim()
+            .split('\n')
+            .pop(),
+        });
       try {
         resolve({ available: true, ...JSON.parse(String(out).trim().split('\n').pop()) });
       } catch {
@@ -135,10 +152,14 @@ function checkUpdates() {
   });
 }
 
-function runUpdate() {
-  if (!hasUpdater()) throw new Error('Updates are only available on the set-top box image');
+/**
+ * Run a long stb-update subcommand (run, provision, games install …), streaming its
+ * '@@' progress lines to the renderer as 'system:update:progress'. One at a time.
+ */
+function runHelper(args) {
+  if (!hasUpdater()) throw new Error('Only available on the set-top box image');
   if (updateProc) return { started: false, running: true };
-  const p = spawn('sudo', ['-n', UPDATER, 'run'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const p = spawn('sudo', ['-n', UPDATER, ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
   updateProc = p;
   let buf = '';
   const emit = (ev) => sendMain('system:update:progress', ev);
@@ -166,6 +187,23 @@ function runUpdate() {
     emit({ type: 'exit', code });
   });
   return { started: true };
+}
+
+/**
+ * Boxes upgraded by an older updater may lack what 1.2 added (BlueZ, Flatpak, the
+ * bluetooth service). Checked without root: binaries present + service enabled.
+ */
+function provisionStatus() {
+  if (!hasUpdater()) return Promise.resolve({ available: false, needed: false });
+  const missing = [];
+  if (!fs.existsSync('/usr/bin/bluetoothctl')) missing.push('bluez-utils');
+  if (!fs.existsSync('/usr/bin/flatpak')) missing.push('flatpak');
+  return new Promise((resolve) =>
+    execFile('systemctl', ['is-enabled', 'bluetooth.service'], { timeout: 5000 }, (err, out) => {
+      if (err || String(out).trim() !== 'enabled') missing.push('bluetooth.service');
+      resolve({ available: true, needed: missing.length > 0, missing });
+    })
+  );
 }
 
 /** Run the root helper with args (and optional stdin), parse its last JSON line. */
@@ -230,6 +268,40 @@ const player = new Player({
   },
 });
 
+// ---------- Bluetooth controllers ----------
+const bluetooth = createBluetooth({ hasUpdater, helper: (args) => helperJson(args), openExternal: (u) => shell.openExternal(u) });
+
+// ---------- Games (GeForce NOW) ----------
+let gamesBlocker = null;
+const execResult = (cmd, args) =>
+  new Promise((resolve) =>
+    execFile(cmd, args, { timeout: 15000, windowsHide: true }, (err, stdout) =>
+      resolve({ code: err ? (err.code === 'ENOENT' ? 127 : err.code || 1) : 0, stdout: String(stdout || '') })
+    )
+  );
+const games = createGames({
+  exec: execResult,
+  spawn: (cmd, args, opts) => spawn(cmd, args, opts),
+  exists: (p) => fs.existsSync(p),
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  isRunningWin: async () => /GeForceNOW\.exe/i.test((await execResult('tasklist', ['/FI', 'IMAGENAME eq GeForceNOW.exe', '/NH'])).stdout),
+  ui: {
+    stopPlayer: () => player.stop({ reason: 'games' }),
+    hide: () => {
+      // GeForce NOW gets the whole screen; keep the display awake while it runs.
+      gamesBlocker ??= powerSaveBlocker.start('prevent-display-sleep');
+      mainWin?.hide();
+    },
+    show: () => {
+      if (gamesBlocker != null) powerSaveBlocker.stop(gamesBlocker);
+      gamesBlocker = null;
+      mainWin?.show();
+      mainWin?.focus();
+    },
+    send: (ch, data) => sendMain(ch, data),
+  },
+});
+
 // ---------- trailers ----------
 const ytdlpPath = async () => resolveTool('yt-dlp', { customPath: (await store.getSettings()).ytdlpPath, resourcesPath: process.resourcesPath });
 const trailers = createTrailers({
@@ -271,9 +343,7 @@ const handlers = {
     player.dispose();
     store.flushDocs();
     // Newer helpers have "poweroff"; otherwise logind lets the logged-in TV user shut down.
-    const viaHelper = await new Promise((res) =>
-      execFile('sudo', ['-n', UPDATER, 'poweroff'], { timeout: 10000 }, (err) => res(!err))
-    );
+    const viaHelper = await new Promise((res) => execFile('sudo', ['-n', UPDATER, 'poweroff'], { timeout: 10000 }, (err) => res(!err)));
     if (viaHelper) return;
     await new Promise((res, rej) =>
       execFile('systemctl', ['poweroff'], { timeout: 10000 }, (err, _o, stderr) => (err ? rej(new Error(String(stderr || err.message).trim())) : res()))
@@ -289,7 +359,9 @@ const handlers = {
   'net:scan': () => helperJson(['wifi', 'scan']),
   'net:connect': ({ ssid, password }) => helperJson(['wifi', 'connect', String(ssid)], `${password || ''}\n`),
   'net:forget': ({ ssid }) => helperJson(['wifi', 'forget', String(ssid)]),
-  'system:update:run': () => runUpdate(),
+  'system:update:run': () => runHelper(['run']),
+  'system:provision:status': () => provisionStatus(),
+  'system:provision:run': () => runHelper(['provision']),
   'system:reboot': () => {
     if (!hasUpdater()) throw new Error('Not available on this system');
     store.flushDocs();
@@ -355,6 +427,22 @@ const handlers = {
   'art:get': (q) => getArtwork(q),
   'art:testKey': (key) => testTmdbKey(key),
   'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
+  'games:status': () => games.status(),
+  'games:install': async () => {
+    if (process.platform === 'win32') {
+      await shell.openExternal(GFN_DOWNLOAD_URL);
+      return { opened: true };
+    }
+    return runHelper(['games', 'install']);
+  },
+  'games:launch': () => games.launch(),
+  'bt:status': () => bluetooth.status(),
+  'bt:scan': ({ seconds } = {}) => bluetooth.scan(seconds),
+  'bt:pair': ({ mac }) => bluetooth.pair(mac),
+  'bt:connect': ({ mac }) => bluetooth.connect(mac),
+  'bt:disconnect': ({ mac }) => bluetooth.disconnect(mac),
+  'bt:forget': ({ mac }) => bluetooth.forget(mac),
+  'bt:openSystemSettings': () => bluetooth.openSystemSettings(),
   'trailer:get': async ({ item }) => ((await trailersOn()) ? trailers.get(titleItem(item)) : { available: false }),
   'trailer:play': async ({ profileId, item, title }) => {
     const t = await trailers.prepare(titleItem(item));

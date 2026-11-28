@@ -1195,7 +1195,6 @@ small {
   background: #000;
 }
 
-
 /* ---------- live tv: timeline guide ---------- */
 .guide {
   --chcol: 21rem;
@@ -1542,8 +1541,7 @@ small {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(to top, #000000 10%, transparent 90%),
-    linear-gradient(to right, #000000 25%, transparent 80%),
+    linear-gradient(to top, #000000 10%, transparent 90%), linear-gradient(to right, #000000 25%, transparent 80%),
     radial-gradient(ellipse at 75% 20%, transparent 40%, rgba(0, 0, 0, 0.55) 100%);
 }
 .home-tabs {
@@ -1789,7 +1787,11 @@ small {
   border-radius: 0.6rem;
   background: #000;
   color: #9ca3af;
-  font: 0.95rem/1.5 ui-monospace, 'Cascadia Mono', 'DejaVu Sans Mono', monospace;
+  font:
+    0.95rem/1.5 ui-monospace,
+    'Cascadia Mono',
+    'DejaVu Sans Mono',
+    monospace;
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -1966,7 +1968,9 @@ small {
   height: 1.4rem;
   border-radius: 50%;
   background: var(--muted);
-  transition: transform 0.2s var(--ease-spring), background 0.2s;
+  transition:
+    transform 0.2s var(--ease-spring),
+    background 0.2s;
 }
 .switch.is-on {
   background: var(--accent);
@@ -2002,7 +2006,9 @@ small {
   height: 0.55rem;
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.28);
-  transition: width 0.3s var(--ease-spring), background 0.3s;
+  transition:
+    width 0.3s var(--ease-spring),
+    background 0.3s;
 }
 .spot-dots i.is-on {
   width: 1.6rem;
@@ -2082,4 +2088,86 @@ small {
 
 .setting-row.is-static {
   color: var(--muted);
+}
+
+/* Controllers: greyed-out rows when there's no Bluetooth adapter (also skipped by focus). */
+.setting-row.is-disabled,
+.settings-reason.is-disabled {
+  opacity: 0.38;
+}
+.setting-row.is-disabled .setting-value {
+  color: var(--muted);
+}
+.settings-reason {
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  padding: 0 1.4rem 0.6rem;
+}
+.bt-modal {
+  min-width: 40rem;
+}
+.bt-steps {
+  margin: 1rem 0 1.6rem 1.4rem;
+  line-height: 1.7;
+  color: var(--text);
+}
+.bt-sub {
+  margin: 1.2rem 0 0.4rem 1.4rem;
+  font-size: 1rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- Games ---------- */
+.games {
+  height: 100%;
+  overflow-y: auto;
+  padding: 0 4rem 6rem 2rem;
+}
+.games-hero {
+  display: flex;
+  gap: 2.5rem;
+  align-items: center;
+  padding: 2.5rem;
+  border-radius: 1.5rem;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%);
+  color: var(--accent);
+}
+.games-copy {
+  color: var(--text, #fff);
+  max-width: 46rem;
+}
+.games-copy h2 {
+  font-size: 2.6rem;
+  margin: 0 0 0.5rem;
+}
+.games-note {
+  color: var(--accent);
+}
+.games-actions {
+  margin-top: 1.5rem;
+}
+.games-play {
+  font-size: 1.6rem;
+  padding: 1.1rem 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.games-info {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+}
+.games-info h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.2rem;
+}
+.games-info p {
+  margin: 0;
+  opacity: 0.75;
+  line-height: 1.45;
 }

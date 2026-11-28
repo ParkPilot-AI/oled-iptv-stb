@@ -92,6 +92,8 @@ electron/
   discover.js          TMDB trending/popular/top-rated/genre lists, recommendations
   trailers.js          TMDB trailer choice + yt-dlp stream resolution
   adult.js             adult-channel PIN (hashed)
+  bluetooth.js         controller pairing via `stb-update bt …` (MAC-checked)
+  games.js             GeForce NOW: launch (Flatpak / Windows .exe), hide + restore ONYX
   imageCache.js        imgcache:// protocol (download → resize → disk)
   store.js             profiles (encrypted), settings, per-profile docs
   data/tvlogos.json    index of official channel logos (scripts/update-tvlogos.mjs)
@@ -99,16 +101,18 @@ src/
   nav/spatial.js       focus engine          nav/keys.js   key map, handler stacks, long-press OK
   components/          Focusable, VirtualGrid, VirtualKeyboard/TextField (+ number pad), Cards,
                        Hub (spotlight carousel + rows), PillTabs, NavRail, Modal/Confirm/Toast,
-                       NetworkSettings (Wi-Fi), SystemUpdate, AdultSettings, TrailerButton,
+                       NetworkSettings (Wi-Fi), SystemUpdate (+ JobModal, ProvisionRow),
+                       ControllerSettings (Bluetooth pairing), AdultSettings, TrailerButton,
                        VolumeHud, Logo, Screensaver, Icons
   views/               Login, Home, LiveTV, Library (Movies/TV Shows), MovieDetail,
-                       SeriesDetail, Favorites, Search, Settings
+                       SeriesDetail, Favorites, Search, Games, Settings
   osd/                 OsdApp (player overlay), Bars (live banner, VOD bar), LiveNav (surf + glass guide)
   lib/                 api bridge (mockApi only in demo builds), store (+ adult filter), art,
-                       discover, genres, theme, epg hooks, search, fav
-test/                  unit tests + mpv IPC test; stb/ updater + Wi-Fi tests; e2e/ mock Xtream server
+                       discover, genres, theme, epg hooks, search, fav, controllers
+test/                  unit tests + mpv IPC test; stb/ updater, Wi-Fi, Bluetooth and Games tests;
+                       e2e/ mock Xtream server
 stb/                   Arch set-top box: ISO build (build.sh, container-build.sh), installer,
-                       box files (stb-update helper, NetworkManager, audio, openbox)
+                       box files (stb-update helper, NetworkManager, BlueZ, audio, openbox)
 resources/mpv/         mpv.exe (and yt-dlp.exe) for Windows builds
 ```
 
@@ -170,6 +174,7 @@ node test/e2e/mock-xtream.mjs     # 300 channels + EPG + 1 movie + 1 series
 | 0–9 | — | Jump to a channel number (Live) |
 | A / S | — | Next audio track / subtitle track, named on screen ("Audio: English · AC3 5.1 (2/3)", "Subtitles: Off") |
 | Volume Up / Down / Mute | Box volume | Box volume |
+| Ctrl+Alt+Home / Home (XF86HomePage) | — | While GeForce NOW is open: close it and return to ONYX (box only) |
 
 **Trailers:** film and series pages have a **Trailer** button when TMDB lists one. It plays full screen in mpv straight from YouTube's video servers through yt-dlp — no YouTube page, no ads — and Back (or the end) returns to the page. Needs a TMDB key and yt-dlp; Settings → Library → Trailers turns it off.
 
@@ -193,6 +198,10 @@ Changes apply to what's playing. **Volume Up / Down / Mute** keys change the box
 **Themes (Settings → General).** Cinema Amber (default; least blue light for dark rooms), Ice Cyan, Cinema Ruby, Electric Violet and Monochrome. The theme colours only moving things — the focus ring, the selected pill, progress bars — plus 4K/HDR badges; text stays neutral (#F5F5F5 / #8E8E93) and LIVE is always red, so nothing coloured sits still on the OLED panel.
 
 **Genres.** With a TMDB key, Movies and TV Shows list genres in the top bar (Action, Comedy, Drama, Sci-Fi…). The Discover tab gains a poster row per genre; a genre tab shows that genre's trending carousel with Popular, Top Rated and Most Liked rows, all matched to your provider's catalogue.
+
+**Controllers (Settings → Controllers).** Pair, connect, disconnect and forget Bluetooth game controllers with the remote: put the controller in pairing mode (Xbox: hold the pair button until the logo flashes fast; PlayStation: hold Share or Create + PS until the light flashes; others: see the controller manual), choose **Pair a controller**, then pick it from the list — controllers are listed first. Paired controllers reconnect on their own when switched on, and a toast says when one connects or disconnects (with battery level when it reports one). Without a Bluetooth adapter the options are greyed out and can't be selected; they enable themselves within a few seconds of plugging a USB adapter in. Works on the box; on Windows use Windows' own Bluetooth settings.
+
+**Games (GeForce NOW).** Turn on **Settings → General → Show Games in sidebar** to add a **Games** item between TV Shows and Favourites. It opens NVIDIA's official GeForce NOW app full screen; ONYX steps aside (playback stops, the screensaver pauses) and comes back, focused on Games, when you quit it. On the box the first visit offers **Install GeForce NOW** (NVIDIA's Flatpak, about 1–2 GB, with live progress); **Update system** keeps it current. On Windows it launches the installed app or opens NVIDIA's download page. You need an NVIDIA account with a GeForce NOW membership and, ideally, a wired connection: NVIDIA recommends at least 25 Mbps for 1080p at 60 fps and 40 Mbps for 4K at 60 fps. If GeForce NOW ever gets stuck, **Ctrl+Alt+Home** on a keyboard (or the Home key on many air-mouse remotes) closes it.
 
 ## 5. Artwork
 

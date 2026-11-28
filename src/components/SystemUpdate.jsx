@@ -1,6 +1,7 @@
 // Settings → "Update system": one button that updates Arch packages and the
 // app (via the set-top box's root helper), with live progress, then restarts
-// the app or offers a reboot when the kernel changed.
+// the app or offers a reboot when the kernel changed. The same progress dialog
+// runs "Finish installing" (stb-update provision) and the GeForce NOW install.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Focusable } from './Focusable.jsx';
@@ -61,7 +62,36 @@ export function UpdateRow() {
   );
 }
 
-function UpdateModal({ st, onClose, onFinished }) {
+/** What each long-running helper job says and which IPC starts it. */
+const JOBS = {
+  update: { invoke: 'system:update:run', running: 'Updating…', done: 'Update complete', failed: 'Update didn’t finish' },
+  provision: {
+    invoke: 'system:provision:run',
+    title: 'Finish installing the update',
+    intro: 'Adds Bluetooth and Games support (Bluetooth, controller settings, Flatpak). Takes a few minutes; keep the box on.',
+    confirm: 'Install now',
+    running: 'Finishing the update…',
+    done: 'Bluetooth and Games support installed',
+    failed: 'Installation didn’t finish',
+  },
+  games: {
+    invoke: 'games:install',
+    title: 'Install GeForce NOW',
+    intro: 'Downloads NVIDIA’s official GeForce NOW app (about 1–2 GB with its runtime). Takes a few minutes.',
+    confirm: 'Install',
+    running: 'Installing GeForce NOW…',
+    done: 'GeForce NOW installed',
+    failed: 'GeForce NOW didn’t install',
+  },
+};
+
+/** Progress dialog for a helper job other than the system update ('provision', 'games'). */
+export function JobModal({ job, onClose, onFinished }) {
+  return <UpdateModal job={job} onClose={onClose} onFinished={onFinished} />;
+}
+
+function UpdateModal({ st, onClose, onFinished, job = 'update' }) {
+  const J = JOBS[job];
   const [phase, setPhase] = useState('confirm'); // confirm | running | done
   const [step, setStep] = useState('Starting…');
   const [log, setLog] = useState([]);
@@ -107,7 +137,7 @@ function UpdateModal({ st, onClose, onFinished }) {
   const start = async () => {
     setPhase('running');
     try {
-      const r = await api.invoke('system:update:run');
+      const r = await api.invoke(J.invoke);
       if (r && r.started === false) setStep('An update is already running…');
     } catch (e) {
       setResult((x) => ({ ...x, error: e.message }));
@@ -119,7 +149,21 @@ function UpdateModal({ st, onClose, onFinished }) {
   return (
     <Modal onClose={phase === 'running' ? () => {} : onClose} className="update-modal">
       <div ref={box}>
-        {phase === 'confirm' && (
+        {phase === 'confirm' && job !== 'update' && (
+          <>
+            <h2>{J.title}</h2>
+            <p className="muted">{J.intro}</p>
+            <div className="row-buttons">
+              <Focusable className="btn btn-primary" autoFocus onSelect={start}>
+                {J.confirm}
+              </Focusable>
+              <Focusable className="btn" onSelect={onClose}>
+                Not now
+              </Focusable>
+            </div>
+          </>
+        )}
+        {phase === 'confirm' && job === 'update' && (
           <>
             <h2>Update system</h2>
             <ul className="update-list">
@@ -144,7 +188,7 @@ function UpdateModal({ st, onClose, onFinished }) {
         )}
         {phase === 'running' && (
           <>
-            <h2>Updating…</h2>
+            <h2>{J.running}</h2>
             <div className="update-step">
               <div className="spinner small" />
               <span>{step}</span>
@@ -159,10 +203,10 @@ function UpdateModal({ st, onClose, onFinished }) {
         )}
         {phase === 'done' && (
           <>
-            <h2>{result.error ? 'Update didn’t finish' : 'Update complete'}</h2>
+            <h2>{result.error ? J.failed : J.done}</h2>
             {result.error ? (
               <p className="error-text">{result.error}</p>
-            ) : (
+            ) : job !== 'update' ? null : (
               <ul className="update-list">
                 <li>System packages updated.</li>
                 <li>{result.app ? `App updated to ${result.app}.` : 'App already up to date.'}</li>
@@ -189,5 +233,42 @@ function UpdateModal({ st, onClose, onFinished }) {
         )}
       </div>
     </Modal>
+  );
+}
+
+// ---------- finishing an upgrade made by an older updater ----------
+
+let provisionCache = null;
+/** { available, needed, missing } — whether 'stb-update provision' still has work to do. */
+export function useProvision() {
+  const [st, setSt] = useState(provisionCache);
+  const refresh = () =>
+    api
+      .invoke('system:provision:status')
+      .then((r) => {
+        provisionCache = r;
+        setSt(r);
+        return r;
+      })
+      .catch(() => null);
+  useEffect(() => {
+    refresh();
+  }, []);
+  return { st, refresh };
+}
+
+/** Settings → System row, shown only while provisioning is incomplete. */
+export function ProvisionRow() {
+  const { st, refresh } = useProvision();
+  const [open, setOpen] = useState(false);
+  if (!st?.needed) return null;
+  return (
+    <>
+      <Focusable className="setting-row has-update" onSelect={() => setOpen(true)}>
+        <span>Finish installing the update</span>
+        <span className="setting-value muted">Adds Bluetooth and Games support</span>
+      </Focusable>
+      {open && <JobModal job="provision" onClose={() => setOpen(false)} onFinished={refresh} />}
+    </>
   );
 }

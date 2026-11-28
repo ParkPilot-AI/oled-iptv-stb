@@ -1,43 +1,180 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { useStore, setState, getState, toast, confirmDialog, activateProfile, loadEpg, applyTheme, applyScreenFit, reloadCatalog, powerOff } from '../lib/store.js';
+import {
+  useStore,
+  setState,
+  getState,
+  toast,
+  confirmDialog,
+  activateProfile,
+  loadEpg,
+  applyTheme,
+  applyScreenFit,
+  reloadCatalog,
+  powerOff,
+} from '../lib/store.js';
 import { clearArtCache } from '../lib/art.js';
 import { THEMES } from '../lib/theme.js';
 import { AdultRows } from '../components/AdultSettings.jsx';
+import { ControllerSettings } from '../components/ControllerSettings.jsx';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
 import { UpdateRow } from '../components/SystemUpdate.jsx';
 import { NetworkRow } from '../components/NetworkSettings.jsx';
+import { ProvisionRow } from '../components/SystemUpdate.jsx';
 import { PillTabs, useTabCycle } from '../components/PillTabs.jsx';
 import { useKeyHandler } from '../nav/keys.js';
 import { focusFirst } from '../nav/spatial.js';
 
 const OPTIONS = {
-  liveFormat: [['ts', 'MPEG-TS (.ts) — lowest latency'], ['m3u8', 'HLS (.m3u8)']],
-  hwdec: [['auto-safe', 'Auto (recommended)'], ['d3d11va', 'D3D11VA (Windows)'], ['vaapi', 'VA-API (Linux Intel)'], ['nvdec', 'NVDEC (NVIDIA)'], ['no', 'Off (software)']],
-  deinterlace: [[false, 'Off'], [true, 'On (interlaced live TV)']],
-  osdTimeoutSec: [[3, '3 seconds'], [4, '4 seconds'], [6, '6 seconds'], [10, '10 seconds']],
-  screensaverMin: [[1, '1 minute'], [3, '3 minutes'], [5, '5 minutes'], [10, '10 minutes']],
-  catalogTtlHours: [[6, 'Every 6 hours'], [12, 'Every 12 hours'], [24, 'Daily'], [168, 'Weekly']],
-  epgTtlHours: [[3, 'Every 3 hours'], [6, 'Every 6 hours'], [12, 'Every 12 hours'], [24, 'Daily']],
-  startFullscreen: [[true, 'On'], [false, 'Off']],
-  overscan: [[0, 'Full screen'], [0.025, 'Shrink 5%'], [0.05, 'Shrink 10%'], [0.075, 'Shrink 15%']],
+  liveFormat: [
+    ['ts', 'MPEG-TS (.ts) — lowest latency'],
+    ['m3u8', 'HLS (.m3u8)'],
+  ],
+  hwdec: [
+    ['auto-safe', 'Auto (recommended)'],
+    ['d3d11va', 'D3D11VA (Windows)'],
+    ['vaapi', 'VA-API (Linux Intel)'],
+    ['nvdec', 'NVDEC (NVIDIA)'],
+    ['no', 'Off (software)'],
+  ],
+  deinterlace: [
+    [false, 'Off'],
+    [true, 'On (interlaced live TV)'],
+  ],
+  osdTimeoutSec: [
+    [3, '3 seconds'],
+    [4, '4 seconds'],
+    [6, '6 seconds'],
+    [10, '10 seconds'],
+  ],
+  screensaverMin: [
+    [1, '1 minute'],
+    [3, '3 minutes'],
+    [5, '5 minutes'],
+    [10, '10 minutes'],
+  ],
+  catalogTtlHours: [
+    [6, 'Every 6 hours'],
+    [12, 'Every 12 hours'],
+    [24, 'Daily'],
+    [168, 'Weekly'],
+  ],
+  epgTtlHours: [
+    [3, 'Every 3 hours'],
+    [6, 'Every 6 hours'],
+    [12, 'Every 12 hours'],
+    [24, 'Daily'],
+  ],
+  startFullscreen: [
+    [true, 'On'],
+    [false, 'Off'],
+  ],
+  overscan: [
+    [0, 'Full screen'],
+    [0.025, 'Shrink 5%'],
+    [0.05, 'Shrink 10%'],
+    [0.075, 'Shrink 15%'],
+  ],
   theme: Object.entries(THEMES).map(([id, t]) => [id, t.name]),
-  artSource: [['prefer', 'TMDB first (recommended)'], ['missing', 'Provider first, TMDB for gaps'], ['off', 'Off']],
-  logoSource: [['prefer', 'Official logos (recommended)'], ['missing', 'Provider first'], ['off', 'Provider logos only']],
-  subMode: [['off', 'Off'], ['on', 'On']],
-  trailers: [[true, 'On'], [false, 'Off']],
-  aspect: [['auto', 'Original'], ['16:9', '16:9'], ['4:3', '4:3'], ['21:9', 'Cinema 21:9'], ['zoom', 'Zoom to fill'], ['stretch', 'Stretch to fill']],
-  upscaling: [['standard', 'Standard'], ['high', 'High quality (more GPU)'], ['fast', 'Fast (weak PCs)']],
-  deband: [[false, 'Off'], [true, 'On (smooths blocky gradients)']],
-  toneMapping: [['auto', 'Automatic'], ['natural', 'Natural'], ['bright', 'Bright']],
-  audioLang: [['auto', 'Stream default'], ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['it', 'Italian'], ['pt', 'Portuguese'], ['nl', 'Dutch'], ['pl', 'Polish'], ['tr', 'Turkish'], ['ar', 'Arabic'], ['hi', 'Hindi'], ['ur', 'Urdu'], ['ro', 'Romanian'], ['el', 'Greek'], ['sv', 'Swedish']],
-  speakers: [['auto', 'Automatic (surround if supported)'], ['stereo', 'Stereo (TV speakers)']],
-  passthrough: [[false, 'Off'], [true, 'On (soundbar / AV receiver)']],
-  nightMode: [['off', 'Off'], ['night', 'Night mode (quieter peaks)'], ['level', 'Even volume (louder dialogue)']],
-  subLang: [['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['it', 'Italian'], ['pt', 'Portuguese'], ['nl', 'Dutch'], ['pl', 'Polish'], ['tr', 'Turkish'], ['ar', 'Arabic'], ['hi', 'Hindi'], ['ur', 'Urdu'], ['ro', 'Romanian'], ['el', 'Greek'], ['sv', 'Swedish']],
-  subSize: [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large'], ['xlarge', 'Extra large']],
-  subBackground: [['box', 'Dark box (easiest to read)'], ['outline', 'Outline only']],
+  artSource: [
+    ['prefer', 'TMDB first (recommended)'],
+    ['missing', 'Provider first, TMDB for gaps'],
+    ['off', 'Off'],
+  ],
+  logoSource: [
+    ['prefer', 'Official logos (recommended)'],
+    ['missing', 'Provider first'],
+    ['off', 'Provider logos only'],
+  ],
+  subMode: [
+    ['off', 'Off'],
+    ['on', 'On'],
+  ],
+  trailers: [
+    [true, 'On'],
+    [false, 'Off'],
+  ],
+  aspect: [
+    ['auto', 'Original'],
+    ['16:9', '16:9'],
+    ['4:3', '4:3'],
+    ['21:9', 'Cinema 21:9'],
+    ['zoom', 'Zoom to fill'],
+    ['stretch', 'Stretch to fill'],
+  ],
+  upscaling: [
+    ['standard', 'Standard'],
+    ['high', 'High quality (more GPU)'],
+    ['fast', 'Fast (weak PCs)'],
+  ],
+  deband: [
+    [false, 'Off'],
+    [true, 'On (smooths blocky gradients)'],
+  ],
+  toneMapping: [
+    ['auto', 'Automatic'],
+    ['natural', 'Natural'],
+    ['bright', 'Bright'],
+  ],
+  audioLang: [
+    ['auto', 'Stream default'],
+    ['en', 'English'],
+    ['es', 'Spanish'],
+    ['fr', 'French'],
+    ['de', 'German'],
+    ['it', 'Italian'],
+    ['pt', 'Portuguese'],
+    ['nl', 'Dutch'],
+    ['pl', 'Polish'],
+    ['tr', 'Turkish'],
+    ['ar', 'Arabic'],
+    ['hi', 'Hindi'],
+    ['ur', 'Urdu'],
+    ['ro', 'Romanian'],
+    ['el', 'Greek'],
+    ['sv', 'Swedish'],
+  ],
+  speakers: [
+    ['auto', 'Automatic (surround if supported)'],
+    ['stereo', 'Stereo (TV speakers)'],
+  ],
+  passthrough: [
+    [false, 'Off'],
+    [true, 'On (soundbar / AV receiver)'],
+  ],
+  nightMode: [
+    ['off', 'Off'],
+    ['night', 'Night mode (quieter peaks)'],
+    ['level', 'Even volume (louder dialogue)'],
+  ],
+  subLang: [
+    ['en', 'English'],
+    ['es', 'Spanish'],
+    ['fr', 'French'],
+    ['de', 'German'],
+    ['it', 'Italian'],
+    ['pt', 'Portuguese'],
+    ['nl', 'Dutch'],
+    ['pl', 'Polish'],
+    ['tr', 'Turkish'],
+    ['ar', 'Arabic'],
+    ['hi', 'Hindi'],
+    ['ur', 'Urdu'],
+    ['ro', 'Romanian'],
+    ['el', 'Greek'],
+    ['sv', 'Swedish'],
+  ],
+  subSize: [
+    ['small', 'Small'],
+    ['medium', 'Medium'],
+    ['large', 'Large'],
+    ['xlarge', 'Extra large'],
+  ],
+  subBackground: [
+    ['box', 'Dark box (easiest to read)'],
+    ['outline', 'Outline only'],
+  ],
 };
 
 /** Sound output: cycles through what this machine actually has (HDMI ports, jack, USB…). */
@@ -45,11 +182,17 @@ function AudioOutputRow({ settings, update }) {
   const [list, setList] = useState(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api.invoke('audio:outputs').then(setList).catch(() => setList({ outputs: [{ id: 'auto', label: 'Automatic' }] }));
+    api
+      .invoke('audio:outputs')
+      .then(setList)
+      .catch(() => setList({ outputs: [{ id: 'auto', label: 'Automatic' }] }));
   }, []);
   const outs = list?.outputs || [];
   const cur = settings.audioDevice || 'auto';
-  const idx = Math.max(0, outs.findIndex((o) => o.id === cur));
+  const idx = Math.max(
+    0,
+    outs.findIndex((o) => o.id === cur)
+  );
   const next = async () => {
     if (busy || outs.length < 2) return;
     const o = outs[(idx + 1) % outs.length];
@@ -75,7 +218,10 @@ function AudioOutputRow({ settings, update }) {
 
 function Cycle({ label, k, settings, update, autoFocus }) {
   const opts = OPTIONS[k];
-  const idx = Math.max(0, opts.findIndex(([v]) => v === settings[k]));
+  const idx = Math.max(
+    0,
+    opts.findIndex(([v]) => v === settings[k])
+  );
   const next = () => update({ [k]: opts[(idx + 1) % opts.length][0] });
   return (
     <Focusable className="setting-row" onSelect={next} autoFocus={autoFocus}>
@@ -166,12 +312,23 @@ const TABS = [
   { id: 'picture', label: 'Picture' },
   { id: 'sound', label: 'Sound' },
   { id: 'subs', label: 'Subtitles' },
+  { id: 'controllers', label: 'Controllers' },
   { id: 'library', label: 'Library' },
   { id: 'system', label: 'System' },
 ];
 const memory = { tab: 'general' };
 
-const PICTURE_RESET = { brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', deinterlace: false };
+const PICTURE_RESET = {
+  brightness: 0,
+  contrast: 0,
+  saturation: 0,
+  gamma: 0,
+  aspect: 'auto',
+  upscaling: 'standard',
+  deband: false,
+  toneMapping: 'auto',
+  deinterlace: false,
+};
 
 export function Settings() {
   const settings = useStore((s) => s.settings);
@@ -224,7 +381,12 @@ export function Settings() {
           {C('Screensaver when paused', 'screensaverMin')}
           <h2>Parental</h2>
           <AdultRows settings={settings} />
-          <TextField label="Custom mpv path" value={settings.mpvPath} onChange={(v) => update({ mpvPath: v })} placeholder={info?.mpvPath ? `Using ${info.mpvPath}` : 'mpv not found'} />
+          <TextField
+            label="Custom mpv path"
+            value={settings.mpvPath}
+            onChange={(v) => update({ mpvPath: v })}
+            placeholder={info?.mpvPath ? `Using ${info.mpvPath}` : 'mpv not found'}
+          />
         </div>
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
           <h2>Screen</h2>
@@ -232,6 +394,8 @@ export function Settings() {
           {C('Theme', 'theme')}
           {C('Start in fullscreen', 'startFullscreen')}
           <Action label="Toggle fullscreen now" onSelect={() => api.invoke('app:toggleFullscreen')} />
+          <h2>Menu</h2>
+          <Toggle label="Show Games in sidebar" on={!!settings.showGames} onChange={(on) => update({ showGames: on })} />
         </div>
       </>
     ),
@@ -286,6 +450,7 @@ export function Settings() {
         </div>
       </>
     ),
+    controllers: <ControllerSettings />,
     library: (
       <>
         <div className="settings-col" data-focus-group="settings-a" data-focus-trap="down">
@@ -314,7 +479,15 @@ export function Settings() {
             value={job.busy.clear ? 'Clearing…' : ''}
             onSelect={() =>
               job.run('clear', async () => {
-                if (!(await confirmDialog({ title: 'Clear caches?', message: 'Channel lists, guide data and posters will be downloaded again.', confirmLabel: 'Clear', danger: true }))) return;
+                if (
+                  !(await confirmDialog({
+                    title: 'Clear caches?',
+                    message: 'Channel lists, guide data and posters will be downloaded again.',
+                    confirmLabel: 'Clear',
+                    danger: true,
+                  }))
+                )
+                  return;
                 toast('Clearing…');
                 await api.invoke('cache:clear', { profileId: pid });
                 activateProfile(getState().profileId, { force: true });
@@ -341,7 +514,8 @@ export function Settings() {
             }
           />
           <p className="credits-note">
-            Movie and TV artwork from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Channel logos from tv-logo/tv-logos (github.com/tv-logo/tv-logos, for personal use) and the iptv-org open database.
+            Movie and TV artwork from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Channel logos from tv-logo/tv-logos
+            (github.com/tv-logo/tv-logos, for personal use) and the iptv-org open database.
           </p>
         </div>
       </>
@@ -354,6 +528,7 @@ export function Settings() {
               <h2>Box</h2>
               <NetworkRow />
               <UpdateRow />
+              <ProvisionRow />
             </>
           )}
           <h2>Power</h2>

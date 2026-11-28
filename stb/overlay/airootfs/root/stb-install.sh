@@ -268,6 +268,10 @@ EOF
 # Network: NetworkManager handles Wi-Fi (wpa_supplicant) and Ethernet; DNS via
 # systemd-resolved. The Wi-Fi profile made in the installer is copied over.
 install -Dm644 "$FILES/nm-stb.conf" "$MNT/etc/NetworkManager/conf.d/stb.conf"
+# Bluetooth game controllers (BlueZ has no drop-in dir, so this is main.conf) and the
+# desktop-portal backend Flatpak apps (GeForce NOW) need in an openbox session.
+install -Dm644 "$FILES/bluetooth-main.conf" "$MNT/etc/bluetooth/main.conf"
+install -Dm644 "$FILES/portals.conf" "$MNT/etc/xdg-desktop-portal/portals.conf"
 mkdir -p "$MNT/etc/NetworkManager/system-connections"
 cp -a /etc/NetworkManager/system-connections/*.nmconnection "$MNT/etc/NetworkManager/system-connections/" 2>/dev/null || true
 chmod 600 "$MNT"/etc/NetworkManager/system-connections/* 2>/dev/null || true
@@ -290,7 +294,7 @@ useradd -m -G wheel,video,audio,input -s /bin/bash tv
 echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/10-wheel
 chmod 440 /etc/sudoers.d/10-wheel
 
-systemctl enable NetworkManager systemd-resolved systemd-timesyncd >/dev/null 2>&1
+systemctl enable NetworkManager bluetooth systemd-resolved systemd-timesyncd >/dev/null 2>&1
 systemctl mask NetworkManager-wait-online.service systemd-networkd-wait-online.service >/dev/null 2>&1
 
 bootctl install >/dev/null 2>&1

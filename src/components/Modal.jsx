@@ -56,14 +56,21 @@ export function ToastHost() {
 }
 
 /** Cycles the root element by a couple of pixels to spread static UI wear on OLED. */
-export function usePixelShift(ref, everyMs = 120000) {
+export function usePixelShift(ref, everyMs = 120000, enabled = true) {
   useEffect(() => {
-    const offsets = [[0, 0], [2, 1], [1, -2], [-2, -1], [-1, 2]];
+    if (!enabled) return;
+    const offsets = [
+      [0, 0],
+      [2, 1],
+      [1, -2],
+      [-2, -1],
+      [-1, 2],
+    ];
     let i = 0;
     const t = setInterval(() => {
       i = (i + 1) % offsets.length;
       if (ref.current) ref.current.style.transform = `translate(${offsets[i][0]}px, ${offsets[i][1]}px)`;
     }, everyMs);
     return () => clearInterval(t);
-  }, [ref, everyMs]);
+  }, [ref, everyMs, enabled]);
 }

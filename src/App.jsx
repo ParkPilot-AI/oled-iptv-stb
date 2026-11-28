@@ -1,7 +1,10 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff } from './lib/store.js';
 import { dispatchKey, dispatchKeyUp, setLongPressHandler, useBack, useKeyHandler, keyAction } from './nav/keys.js';
 import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
+import { JobModal, useProvision } from './components/SystemUpdate.jsx';
+import { startControllerWatch } from './lib/controllers.js';
+import { api } from './lib/api.js';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';
 import { NavRail } from './components/NavRail.jsx';
 import { ConfirmHost, ToastHost, usePixelShift } from './components/Modal.jsx';
@@ -14,6 +17,7 @@ import { Library } from './views/Library.jsx';
 import { Favorites } from './views/Favorites.jsx';
 import { Search } from './views/Search.jsx';
 import { Settings } from './views/Settings.jsx';
+import { Games } from './views/Games.jsx';
 import { MovieDetail } from './views/MovieDetail.jsx';
 import { SeriesDetail } from './views/SeriesDetail.jsx';
 
@@ -35,10 +39,21 @@ const UI_SCREENSAVER_MS = 10 * 60 * 1000;
 function MainApp() {
   const bootState = useStore((s) => s.boot);
   const rootRef = useRef(null);
-  const [idle, setIdle] = useIdle(UI_SCREENSAVER_MS);
+  // While GeForce NOW has the screen, ONYX is hidden: no screensaver or pixel shift.
+  const gamesRunning = useStore((s) => s.gamesRunning);
+  const [idle, setIdle] = useIdle(UI_SCREENSAVER_MS, !gamesRunning);
   const idleRef = useRef(idle);
   idleRef.current = idle;
-  usePixelShift(rootRef);
+  usePixelShift(rootRef, 120000, !gamesRunning);
+  useEffect(
+    () =>
+      api.on('games:state', ({ running }) => {
+        setState({ gamesRunning: running });
+        // Back from GeForce NOW: focus returns to the Games item in the menu.
+        if (!running) requestAnimationFrame(() => focusByKey('rail-games') || focusGroup('rail'));
+      }),
+    []
+  );
 
   useEffect(() => {
     boot().catch((e) => setState({ boot: 'login', catalogStatus: { error: e.message } }));
@@ -92,12 +107,39 @@ function MainApp() {
       {bootState === 'login' && <Login />}
       {bootState === 'catalog' && <CatalogLoading />}
       {bootState === 'ready' && <Shell />}
+      {bootState === 'ready' && <ProvisionPrompt />}
+      {bootState === 'ready' && <ControllerWatch />}
       <ConfirmHost />
       <ToastHost />
       <VolumeHud />
       {idle && <Screensaver />}
     </div>
   );
+}
+
+/**
+ * Boxes upgraded to 1.2 by the 1.1 updater are missing Bluetooth/Flatpak until
+ * 'stb-update provision' runs: ask once (it stays in Settings → System after that).
+ */
+/** Watch controllers in the background (connect/disconnect toasts). */
+function ControllerWatch() {
+  useEffect(() => startControllerWatch(), []);
+  return null;
+}
+
+function ProvisionPrompt() {
+  const settings = useStore((s) => s.settings);
+  const { st, refresh } = useProvision();
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (st?.needed && !settings?.provisionPrompted) {
+      setOpen(true);
+      api.invoke('settings:update', { provisionPrompted: true }).then((s) => setState({ settings: s }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st?.needed]);
+  if (!open) return null;
+  return <JobModal job="provision" onClose={() => setOpen(false)} onFinished={refresh} />;
 }
 
 function Splash({ text }) {
@@ -156,7 +198,7 @@ function Shell() {
     { priority: -100 }
   );
 
-  const View = { home: Home, live: LiveTV, movies: Library, series: Library, favorites: Favorites, search: Search, settings: Settings }[section];
+  const View = { home: Home, live: LiveTV, movies: Library, series: Library, favorites: Favorites, search: Search, settings: Settings, games: Games }[section];
 
   return (
     <div className="shell">
