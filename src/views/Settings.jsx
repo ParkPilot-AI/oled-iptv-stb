@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import { useStore, setState, getState, toast, confirmDialog, activateProfile, loadEpg, applyAccent, applyScreenFit, reloadCatalog, powerOff } from '../lib/store.js';
+import { useStore, setState, getState, toast, confirmDialog, activateProfile, loadEpg, applyTheme, applyScreenFit, reloadCatalog, powerOff } from '../lib/store.js';
 import { clearArtCache } from '../lib/art.js';
+import { THEMES } from '../lib/theme.js';
 import { Focusable } from '../components/Focusable.jsx';
 import { TextField } from '../components/VirtualKeyboard.jsx';
 import { UpdateRow } from '../components/SystemUpdate.jsx';
@@ -20,7 +21,7 @@ const OPTIONS = {
   epgTtlHours: [[3, 'Every 3 hours'], [6, 'Every 6 hours'], [12, 'Every 12 hours'], [24, 'Daily']],
   startFullscreen: [[true, 'On'], [false, 'Off']],
   overscan: [[0, 'Full screen'], [0.025, 'Shrink 5%'], [0.05, 'Shrink 10%'], [0.075, 'Shrink 15%']],
-  accent: [['#3B82F6', 'Blue'], ['#DC143C', 'Crimson'], ['#10B981', 'Emerald'], ['#A78BFA', 'Violet'], ['#F59E0B', 'Amber']],
+  theme: Object.entries(THEMES).map(([id, t]) => [id, t.name]),
   artSource: [['prefer', 'TMDB first (recommended)'], ['missing', 'Provider first, TMDB for gaps'], ['off', 'Off']],
   logoSource: [['prefer', 'Official logos (recommended)'], ['missing', 'Provider first'], ['off', 'Provider logos only']],
   subMode: [['off', 'Off'], ['on', 'On']],
@@ -78,7 +79,7 @@ function Cycle({ label, k, settings, update, autoFocus }) {
     <Focusable className="setting-row" onSelect={next} autoFocus={autoFocus}>
       <span>{label}</span>
       <span className="setting-value">
-        {k === 'accent' && <i className="swatch" style={{ background: settings.accent }} />}
+        {k === 'theme' && <i className="swatch" style={{ background: THEMES[settings.theme]?.accent }} />}
         {opts[idx][1]} <span className="muted">›</span>
       </span>
     </Focusable>
@@ -158,7 +159,7 @@ export function Settings() {
 
   const update = async (patch) => {
     const s = await api.invoke('settings:update', patch);
-    if (patch.accent) applyAccent(patch.accent);
+    if (patch.theme) applyTheme(patch.theme);
     if ('overscan' in patch) applyScreenFit(patch.overscan);
     setState({ settings: s });
     if ('artSource' in patch || 'tmdbKey' in patch) clearArtCache();
@@ -191,7 +192,7 @@ export function Settings() {
         <div className="settings-col" data-focus-group="settings-b" data-focus-trap="down">
           <h2>Screen</h2>
           {C('Screen fit (if edges are cut off)', 'overscan')}
-          {C('Accent colour', 'accent')}
+          {C('Theme', 'theme')}
           {C('Start in fullscreen', 'startFullscreen')}
           <Action label="Toggle fullscreen now" onSelect={() => api.invoke('app:toggleFullscreen')} />
         </div>

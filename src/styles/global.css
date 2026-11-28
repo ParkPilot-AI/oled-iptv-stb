@@ -7,15 +7,21 @@
   --card: #0c0c0e;
   --card-2: #16161a;
   --line: #1a1a1e;
-  --text: #eaeaea;
-  --muted: #9ca3af;
-  --accent: #3b82f6;
+  /* Neutral text; colour comes from the theme (src/lib/theme.js). */
+  --text: #f5f5f5;
+  --muted: #8e8e93;
+  --accent: #f59e0b;
+  --accent-fill: rgba(245, 158, 11, 0.14);
+  --accent-ink: #000;
+  --accent-glow: transparent;
+  --badge: #fde68a;
+  --live: #ef4444;
   --danger: #ef4444;
   --radius: 0.9rem;
   --rail: 4.5rem; /* 72 px at 1080p, scales with the screen */
   --rail-open: 15rem; /* 240 px */
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
-  --ring: 0 0.75rem 2rem rgba(0, 0, 0, 0.85), 0 0 0 2px rgba(234, 234, 234, 0.9);
+  --ring: 0 0.75rem 2rem rgba(0, 0, 0, 0.85), 0 0 0 2px var(--accent), 0 0 1.4rem 0.2rem var(--accent-glow);
   /* Screen fit: --safe is the overscan margin per edge (0–0.075). The layout is
      authored on a 120×67.5 rem (16:9) canvas and scaled to fit BOTH width and
      height, so nothing is cut off on 16:10 screens, windows or cropping TVs. */
@@ -155,7 +161,8 @@ small {
 }
 .btn-primary:focus {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
+  box-shadow: 0 0 1.4rem 0.2rem var(--accent-glow);
 }
 .btn-danger:focus {
   background: var(--danger);
@@ -255,14 +262,14 @@ small {
   color: var(--text);
 }
 .rail-item.is-active .icon {
-  color: var(--accent);
+  color: var(--text); /* static: kept neutral to protect the OLED panel */
 }
 .rail-item:focus {
-  background: var(--text);
-  color: #000;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .rail-item:focus .icon {
-  color: #000;
+  color: var(--accent-ink);
 }
 .rail-label {
   opacity: 0;
@@ -319,7 +326,7 @@ small {
   min-width: 0;
 }
 .list-row:focus {
-  background: var(--card-2);
+  background: var(--accent-fill);
   box-shadow: inset 0 0 0 0.2rem var(--accent);
 }
 .cat-row {
@@ -862,7 +869,7 @@ small {
   background: var(--card);
 }
 .ep-row:focus {
-  background: var(--card-2);
+  background: var(--accent-fill);
   box-shadow: inset 0 0 0 0.22rem var(--accent);
 }
 .ep-num {
@@ -968,8 +975,8 @@ small {
   color: var(--accent);
 }
 .vkb-key:focus {
-  background: var(--text);
-  color: #000;
+  background: var(--accent);
+  color: var(--accent-ink);
   transform: scale(1.08);
 }
 .vkb-done {
@@ -977,7 +984,7 @@ small {
 }
 .vkb-done:focus {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 /* ---------- modal ---------- */
@@ -1085,7 +1092,7 @@ small {
 }
 .textfield:focus,
 .setting-row:focus {
-  background: var(--card-2);
+  background: var(--accent-fill);
   box-shadow: inset 0 0 0 0.2rem var(--accent);
 }
 .textfield-label {
@@ -1281,8 +1288,8 @@ small {
   color: var(--text);
 }
 .chip:focus {
-  background: var(--text);
-  color: #000;
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 
 .guide-timeline {
@@ -1430,14 +1437,15 @@ small {
 .prog:focus {
   background: var(--accent);
   background-clip: padding-box;
-  color: #fff;
+  color: var(--accent-ink);
   z-index: 2;
 }
 .prog:focus .prog-time {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--accent-ink);
+  opacity: 0.8;
 }
 .prog:focus .prog-progress {
-  background: #fff;
+  background: var(--accent-ink);
 }
 .guide-now {
   position: absolute;
@@ -1479,8 +1487,8 @@ small {
   color: var(--text);
 }
 .pill:focus {
-  background: var(--text);
-  color: #000;
+  background: var(--accent);
+  color: var(--accent-ink);
   transform: scale(1.05);
 }
 .pill-count {
@@ -1681,7 +1689,7 @@ small {
 
 /* ---------- LIVE badge ---------- */
 .tag-live {
-  background: #dc2626;
+  background: var(--live);
   animation: live-pulse 2.4s ease-in-out infinite;
 }
 @keyframes live-pulse {
@@ -2051,4 +2059,10 @@ small {
 .home-rows .carousel-viewport {
   -webkit-mask-image: linear-gradient(to right, transparent 0, #000 2.4rem);
   mask-image: linear-gradient(to right, transparent 0, #000 2.4rem);
+}
+
+/* Quality badges (4K / HDR / FHD) use the theme's secondary colour. */
+.meta-pill.is-badge {
+  color: #000;
+  background: var(--badge);
 }

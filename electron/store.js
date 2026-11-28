@@ -134,7 +134,7 @@ export const DEFAULT_SETTINGS = {
   osdTimeoutSec: 4,
   screensaverMin: 3,
   startFullscreen: true,
-  accent: '#3B82F6',
+  theme: 'amber', // amber | cyan | crimson | violet | mono
   overscan: 0, // per-edge safe margin for TVs that crop the picture
   tmdbKey: '', // free key from themoviedb.org (v3 key or v4 read token)
   artSource: 'prefer', // movies/series artwork: prefer (TMDB first) | missing (provider first) | off
@@ -167,6 +167,10 @@ export async function getSettings() {
   if (!settingsCache) {
     const saved = await readJson(settingsFile(), {});
     // v2 defaults: TMDB artwork first, subtitles off (earlier builds defaulted otherwise).
+    if (!saved.theme && saved.accent) {
+      // Accent colours → themes.
+      saved.theme = { '#DC143C': 'crimson', '#A78BFA': 'violet', '#F59E0B': 'amber', '#10B981': 'cyan', '#3B82F6': 'amber' }[saved.accent] || 'amber';
+    }
     if (!saved.v3) {
       if (saved.logoSource === 'missing') delete saved.logoSource; // v3: official logos first
       saved.v3 = true;

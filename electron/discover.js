@@ -18,6 +18,15 @@ const LISTS = {
   most_liked: (k) => [`/discover/${k}`, { sort_by: 'vote_count.desc', 'vote_count.gte': 1000 }],
 };
 
+/** 'genre:<id>[:popular|top|liked]' → TMDB discover query for one genre. */
+function genreList(name, kind) {
+  const m = /^genre:(\d+)(?::(popular|top|liked))?$/.exec(name);
+  if (!m) return null;
+  const sort = { popular: 'popularity.desc', top: 'vote_average.desc', liked: 'vote_count.desc' }[m[2] || 'popular'];
+  const extra = m[2] === 'top' ? { 'vote_count.gte': 300 } : m[2] === 'liked' ? { 'vote_count.gte': 500 } : { 'vote_count.gte': 50 };
+  return { path: `/discover/${kind}`, params: { with_genres: m[1], sort_by: sort, ...extra }, pages: m[2] ? 4 : 3 };
+}
+
 const cacheFile = () => path.join(dataDir(), 'discover-cache.json');
 let cache = null;
 let saveTimer = null;
@@ -89,12 +98,12 @@ export async function getLists(kind, names = Object.keys(LISTS)) {
   if (!k || (kind !== 'movie' && kind !== 'tv')) return {};
   const out = {};
   await Promise.all(
-    names
-      .filter((n) => LISTS[n])
-      .map(async (n) => {
-        const [p, params] = LISTS[n](kind);
-        out[n] = await cached(`${kind}:${n}`, LIST_TTL, () => pages(p, params, k, PAGES)).catch(() => []);
-      })
+    names.map(async (n) => {
+      const g = genreList(n, kind);
+      if (!g && !LISTS[n]) return;
+      const [p, params, count] = g ? [g.path, g.params, g.pages] : [...LISTS[n](kind), PAGES];
+      out[n] = await cached(`${kind}:${n}`, LIST_TTL, () => pages(p, params, k, count)).catch(() => []);
+    })
   );
   return out;
 }

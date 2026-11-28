@@ -1,3 +1,4 @@
+import { applyTheme } from './theme.js';
 // Tiny global store (useSyncExternalStore) + catalog indexing, favorites,
 // progress and playback helpers.
 import { useSyncExternalStore } from 'react';
@@ -88,7 +89,7 @@ export const confirmDialog = (opts) =>
 // ---------- boot / profiles ----------
 export async function boot() {
   const [profiles, settings] = await Promise.all([api.invoke('profiles:list'), api.invoke('settings:get')]);
-  applyAccent(settings.accent);
+  applyTheme(settings.theme);
   applyScreenFit(settings.overscan);
   setState({ profiles, settings });
   if (profiles.activeId && profiles.list.some((p) => p.id === profiles.activeId)) {
@@ -96,9 +97,7 @@ export async function boot() {
   } else setState({ boot: 'login' });
 }
 
-export function applyAccent(color) {
-  document.documentElement.style.setProperty('--accent', color || '#3B82F6');
-}
+export { applyTheme } from './theme.js';
 
 /** Overscan margin per edge (0, 0.025, 0.05, 0.075) for TVs that crop the picture. */
 export function applyScreenFit(safe) {

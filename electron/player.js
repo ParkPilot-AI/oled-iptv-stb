@@ -127,6 +127,7 @@ export class Player {
       active: true,
       profileId: s.profileId,
       osdTimeoutSec: s.settings.osdTimeoutSec,
+      theme: s.settings.theme,
       screensaverMin: s.settings.screensaverMin,
       overscan: s.settings.overscan || 0,
       kind: item.kind,

@@ -163,6 +163,10 @@ Changes apply to what's playing. **Volume Up / Down / Mute** keys change the box
 
 **Discovery (needs a TMDB key).** Home opens on a spotlight carousel of trending films and shows (◀ ▶ to browse, it also advances by itself), followed by Continue Watching, *Because you watched…* recommendations for your two most recent titles, Popular Movies and Popular TV Shows. Movies and TV Shows each get a **Discover** tab with a trending carousel and Popular, Top Rated and Most Liked rows (most liked = most votes on TMDB). Every TMDB list is matched against your provider's catalogue (by the provider's TMDB id when it sends one, otherwise by title and year), so you only see titles you can play. Lists are cached for 12 hours.
 
+**Themes (Settings → General).** Cinema Amber (default; least blue light for dark rooms), Ice Cyan, Cinema Ruby, Electric Violet and Monochrome. The theme colours only moving things — the focus ring, the selected pill, progress bars — plus 4K/HDR badges; text stays neutral (#F5F5F5 / #8E8E93) and LIVE is always red, so nothing coloured sits still on the OLED panel.
+
+**Genres.** With a TMDB key, Movies and TV Shows list genres in the top bar (Action, Comedy, Drama, Sci-Fi…). The Discover tab gains a poster row per genre; a genre tab shows that genre's trending carousel with Popular, Top Rated and Most Liked rows, all matched to your provider's catalogue.
+
 ## 5. Artwork
 
 * **Channel logos** come from the open [iptv-org](https://github.com/iptv-org/api) database, with no key needed. Channels are matched by EPG id first, then by name (ignoring "UK:", "HD", "4K" and similar), using the country prefix to tell apart channels that share a name. Matching runs in the background worker and is refreshed weekly.

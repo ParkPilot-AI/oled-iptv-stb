@@ -7,6 +7,7 @@ import { clock, duration, progressPct, epLabel, bitrate } from '../lib/format.js
 import { Icon } from '../components/Icons.jsx';
 import { Screensaver } from '../components/Screensaver.jsx';
 import { VolumeHud, changeVolume } from '../components/VolumeHud.jsx';
+import { applyTheme } from '../lib/theme.js';
 import { usePixelShift } from '../components/Modal.jsx';
 import { useLiveNav, SurfBanner, GlassGuide } from './LiveNav.jsx';
 import './osd.css';
@@ -15,6 +16,7 @@ const cmd = (c) => api.invoke('player:command', c).catch(() => {});
 
 export default function OsdApp() {
   const [st, setSt] = useState(null);
+  useEffect(() => applyTheme(st?.theme), [st?.theme]);
   const [visible, setVisible] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
   const [digits, setDigits] = useState('');

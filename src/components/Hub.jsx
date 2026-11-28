@@ -15,6 +15,7 @@ import { useArt, useArtSettings, chooseArt } from '../lib/art.js';
 import { clock, pad, humanDuration, progressPct } from '../lib/format.js';
 
 const SLIDE_MS = 8000;
+const QUALITY_TAGS = new Set(['4K', 'HDR', 'FHD', 'HD']);
 export const epBadge = (e) => `S${pad(e.season)} • E${pad(e.episode)}`;
 
 const slideHero = (it) => ({ kind: it.kind, item: it, title: it.name });
@@ -265,7 +266,7 @@ function Spotlight({ hero, carousel }) {
         {(hero.subtitle || (live && hero.now)) && <div className="spot-sub">{hero.subtitle || it.name}</div>}
         <div className="spot-pills">
           {pills.filter(Boolean).map((p) => (
-            <span key={p} className="meta-pill">
+            <span key={p} className={`meta-pill ${QUALITY_TAGS.has(p) ? 'is-badge' : ''}`}>
               {p}
             </span>
           ))}

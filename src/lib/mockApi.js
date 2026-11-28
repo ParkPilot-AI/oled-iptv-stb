@@ -128,7 +128,7 @@ export function createMockApi() {
   const emit = (ch, data) => listeners.get(ch)?.forEach((cb) => cb(data));
   let catalog = null;
   let vol = { volume: 60, muted: false };
-  let settings = { overscan: 0, tmdbKey: '', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, accent: '#3B82F6', audioDevice: 'auto', subMode: 'off', brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', audioLang: 'auto', audioDelayMs: 0, nightMode: 'off', passthrough: false, speakers: 'auto', artSource: 'prefer', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
+  let settings = { overscan: 0, tmdbKey: '', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, theme: 'amber', audioDevice: 'auto', subMode: 'off', brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', audioLang: 'auto', audioDelayMs: 0, nightMode: 'off', passthrough: false, speakers: 'auto', artSource: 'prefer', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const wifi = {
@@ -269,7 +269,7 @@ export function createMockApi() {
     },
     'system:reboot': () => setTimeout(() => location.reload(), 500),
     'art:get': (q) => (settings.tmdbKey ? { poster: null, backdrop: backdropArt(q.id), logo: titleLogo(q.name), overview: null } : null),
-    'discover:lists': async ({ kind }) => {
+    'discover:lists': async ({ kind, names = ['trending', 'popular', 'top_rated', 'most_liked'] }) => {
       if (!settings.tmdbKey) return {};
       await wait(250);
       catalog ||= makeCatalog();
@@ -279,7 +279,8 @@ export function createMockApi() {
         return { id: 900000 + it.id, title: m ? m[1] : it.name, original: '', year: m ? m[2] : it.year || '', overview: `Trending pick: ${m ? m[1] : it.name}. A demo synopsis for the spotlight carousel.`, backdrop: backdropArt(it.id), poster: null, rating: 7.8 };
       };
       const list = (off, step) => Array.from({ length: 40 }, (_, i) => fake(items[(off + i * step) % items.length]));
-      return { trending: list(3, 37), popular: list(11, 53), top_rated: list(17, 71), most_liked: list(29, 89) };
+      const hash = (n) => [...n].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 997, 7);
+      return Object.fromEntries(names.map((n) => [n, list(hash(n), 37 + (hash(n) % 50))]));
     },
     'discover:recs': async ({ item }) => {
       if (!settings.tmdbKey) return { results: [] };

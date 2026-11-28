@@ -62,25 +62,33 @@ export function matchList(results, matcher, { limit = 30, exclude } = {}) {
 
 const listCache = new Map();
 
-/** Matched discovery lists for 'movie' or 'tv'. Returns {} until loaded / without a TMDB key. */
-export function useDiscover(kind) {
+const BASE = ['trending', 'popular', 'top_rated', 'most_liked'];
+
+/**
+ * Matched discovery lists for 'movie' or 'tv' (names: trending, popular, top_rated,
+ * most_liked, genre:<id>[:top|:liked]). Returns {} until loaded / without a TMDB key.
+ */
+export function useDiscover(kind, names = BASE) {
+  const sig = `${kind}|${names.join(',')}`;
   const hasKey = useStore((s) => !!s.settings?.tmdbKey && s.settings?.artSource !== 'off');
   const section = useStore((s) => s.catalog[kind === 'tv' ? 'series' : 'vod']);
-  const [raw, setRaw] = useState(() => listCache.get(kind) || null);
+  const [raw, setRaw] = useState(() => listCache.get(sig) || null);
   useEffect(() => {
-    if (!hasKey) return setRaw(null);
+    if (!hasKey || !names.length) return setRaw(null);
+    setRaw(listCache.get(sig) || null);
     let alive = true;
     api
-      .invoke('discover:lists', { kind })
+      .invoke('discover:lists', { kind, names })
       .then((r) => {
-        listCache.set(kind, r);
+        listCache.set(sig, r);
         if (alive) setRaw(r);
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [kind, hasKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig, hasKey]);
   const matcher = useMemo(() => (raw ? matcherFor(section) : null), [raw, section]);
   return useMemo(() => {
     if (!raw || !matcher) return {};
