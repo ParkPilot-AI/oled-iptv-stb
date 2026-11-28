@@ -2264,3 +2264,36 @@ small {
   background: var(--live);
   flex: none;
 }
+
+/* ---------- Playlist form: QR code for typing it on a phone ---------- */
+.form-with-qr {
+  display: flex;
+  gap: 4rem;
+  align-items: flex-start;
+}
+.phone-qr {
+  width: 20rem;
+  padding: 1.6rem;
+  border-radius: 1.2rem;
+  background: var(--card);
+  text-align: center;
+}
+.phone-qr svg {
+  width: 15rem;
+  height: 15rem;
+  border-radius: 0.6rem;
+}
+.phone-qr h3 {
+  margin: 1.1rem 0 0.4rem;
+  font-size: 1.3rem;
+}
+.phone-qr p {
+  margin: 0 0 0.8rem;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.phone-qr small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}

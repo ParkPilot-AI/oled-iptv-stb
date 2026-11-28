@@ -32,6 +32,8 @@ const INVOKE = new Set([
   'games:status',
   'games:install',
   'games:launch',
+  'phonelogin:start',
+  'phonelogin:stop',
   'bt:status',
   'bt:scan',
   'bt:pair',
@@ -68,7 +70,7 @@ const EVENTS = new Set([
   'player:key',
   'system:update:progress',
   'volume:changed',
-  'games:state', 'player:window',
+  'games:state', 'player:window', 'phonelogin:submit',
 ]);
 
 contextBridge.exposeInMainWorld('iptv', {

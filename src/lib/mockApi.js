@@ -429,6 +429,12 @@ export function createMockApi() {
       return { started: true };
     },
     'system:reboot': () => setTimeout(() => location.reload(), 500),
+    // Phone sign-in (dev console: mockPhoneLogin({ server, username, password })).
+    'phonelogin:start': () => {
+      window.mockPhoneLogin = (f) => emit('phonelogin:submit', { name: '', ...f });
+      return { url: 'http://192.168.1.23:41837/3f9a1c7e5b2d4a60aa11bb22' };
+    },
+    'phonelogin:stop': () => null,
     // Games (dev console: localStorage 'mock:gfn'='1' → installed).
     'games:status': () => ({
       platform: 'linux',

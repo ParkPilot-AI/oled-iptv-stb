@@ -25,6 +25,7 @@ import { createBluetooth } from './bluetooth.js';
 import { createGames, GFN_DOWNLOAD_URL } from './games.js';
 import { watchSignin, createSigninWindow, signinDir } from './signin.js';
 import { pipRect, mpvGeometry } from './pip.js';
+import { createPhoneLogin } from './phonelogin.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -306,6 +307,9 @@ const player = new Player({
   },
 });
 
+// ---------- playlist sign-in from a phone (QR code on the TV) ----------
+const phoneLogin = createPhoneLogin({ onSubmit: (fields) => sendMain('phonelogin:submit', fields) });
+
 // ---------- Bluetooth controllers ----------
 const bluetooth = createBluetooth({ hasUpdater, helper: (args) => helperJson(args), openExternal: (u) => shell.openExternal(u) });
 
@@ -465,6 +469,8 @@ const handlers = {
   'art:get': (q) => getArtwork(q),
   'art:testKey': (key) => testTmdbKey(key),
   'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
+  'phonelogin:start': () => phoneLogin.start(),
+  'phonelogin:stop': () => phoneLogin.stop(),
   'games:status': () => games.status(),
   'games:install': async () => {
     if (process.platform === 'win32') {
