@@ -3,16 +3,22 @@
 // progress persistence and state broadcasting to the transparent OSD window.
 import path from 'node:path';
 import fsp from 'node:fs/promises';
+import os from 'node:os';
 import { Mpv, buildMpvArgs, makeIpcPath, resolveMpvBinary, resolveTool, INPUT_CONF } from './mpv.js';
 import { streamUrl } from './xtream.js';
 import { pickSubtitle, subStyleProps } from './subs.js';
 import { videoProps, audioProps } from './mpvprops.js';
 import { describeTrack } from './tracks.js';
+import { channelIndexForNumber } from './channels.js';
 import { mpvStartArgs } from './trailers.js';
 import { getCredentials, getSettings, getDoc, setDoc, peekDoc, dataDir } from './store.js';
 
 const PROGRESS_EVERY_MS = 10000;
 const WATCHED_RATIO = 0.92;
+const FREEZE_GRAB_MS = 700; // give up on the freeze frame rather than delay the zap
+
+/** Resolve within ms or give null (never throws). */
+const within = (p, ms) => Promise.race([p.catch(() => null), new Promise((r) => setTimeout(() => r(null), ms))]);
 
 export class Player {
   /**
@@ -39,9 +45,7 @@ export class Player {
     const settings = await getSettings();
     const binary = resolveMpvBinary({ customPath: settings.mpvPath, resourcesPath: this.ui.resourcesPath });
     if (!binary) {
-      throw new Error(
-        'mpv was not found. Install mpv (or place mpv.exe in resources/mpv) or set its path in Settings.'
-      );
+      throw new Error('mpv was not found. Install mpv (or place mpv.exe in resources/mpv) or set its path in Settings.');
     }
     const inputConf = path.join(dataDir(), 'mpv-input.conf');
     await fsp.writeFile(inputConf, INPUT_CONF);
@@ -74,6 +78,9 @@ export class Player {
     await mpv.start();
     this.mpv = mpv;
     await this._applyOutputAndStyle(mpv, settings);
+    // Freeze frames for channel changes: small, fast JPEGs.
+    await mpv.set('screenshot-format', 'jpg').catch(() => {});
+    await mpv.set('screenshot-jpeg-quality', 70).catch(() => {});
     return mpv;
   }
 
@@ -125,7 +132,36 @@ export class Player {
     await this._loadCurrent({ resume });
   }
 
-  async _loadCurrent({ resume = true, autoNext = false } = {}) {
+  /**
+   * Live TV zapping: grab the current picture so the overlay can keep showing it
+   * (dimmed, with a small spinner) while the next channel connects, instead of a
+   * black screen. Returns a data: URL, or null if it isn't quick enough.
+   */
+  async _grabFrame() {
+    const st = this.state;
+    if (!this.mpv || !st || st.kind !== 'live' || st.buffering || st.error) return null;
+    const file = path.join(os.tmpdir(), `onyx-freeze-${process.pid}.jpg`);
+    const ok = await within(
+      this.mpv.command('screenshot-to-file', file, 'video').then(() => true),
+      FREEZE_GRAB_MS
+    );
+    if (!ok) return null;
+    try {
+      const buf = await fsp.readFile(file);
+      fsp.rm(file, { force: true }).catch(() => {});
+      return buf.length ? `data:image/jpeg;base64,${buf.toString('base64')}` : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async _zapTo(index) {
+    const freeze = await this._grabFrame();
+    this.session.index = index;
+    return this._loadCurrent({ resume: true, freeze });
+  }
+
+  async _loadCurrent({ resume = true, autoNext = false, freeze = null } = {}) {
     const s = this.session;
     const item = s.items[s.index];
     const url = this._urlFor(item);
@@ -152,6 +188,8 @@ export class Player {
       tracks: { audio: [], sub: [], aid: null, sid: null },
       error: null,
       autoNext,
+      freeze, // last picture of the previous channel, shown until this one starts
+      next: item.kind === 'episode' && s.items[s.index + 1] ? s.items[s.index + 1] : null,
       loadedAt: Date.now(),
     };
     this._broadcast(true);
@@ -245,7 +283,11 @@ export class Player {
   _onEvent(e) {
     const st = this.state;
     if (!this.session || !st) return;
-    if (e.event === 'file-loaded') {
+    if (e.event === 'playback-restart' && st.freeze) {
+      // First picture of the new channel is up: drop the freeze frame.
+      st.freeze = null;
+      this._broadcast(true);
+    } else if (e.event === 'file-loaded') {
       st.buffering = false;
       st.error = null;
       this._broadcast(true);
@@ -292,6 +334,7 @@ export class Player {
     }
     st.error = `Stream unavailable (${msg})`;
     st.buffering = false;
+    st.freeze = null;
     this._broadcast(true);
   }
 
@@ -366,15 +409,12 @@ export class Player {
         if (s.items.length < 2 && cmd.type === 'zap') return;
         this._saveProgress();
         const n = s.items.length;
-        s.index = cmd.type === 'zap' ? (s.index + cmd.delta + n) % n : Math.max(0, Math.min(n - 1, cmd.index));
-        return this._loadCurrent({ resume: true });
+        return this._zapTo(cmd.type === 'zap' ? (s.index + cmd.delta + n) % n : Math.max(0, Math.min(n - 1, cmd.index)));
       }
       case 'jump-num': {
-        const idx = s.items.findIndex((it) => it.num === cmd.num);
-        const target = idx >= 0 ? idx : cmd.num - 1;
-        if (target < 0 || target >= s.items.length || target === s.index) return;
-        s.index = target;
-        return this._loadCurrent({ resume: true });
+        const target = channelIndexForNumber(s.items, cmd.num);
+        if (target < 0 || target === s.index) return;
+        return this._zapTo(target);
       }
       case 'cycle-audio':
       case 'cycle-sub': {

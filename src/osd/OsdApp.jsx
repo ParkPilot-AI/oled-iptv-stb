@@ -16,6 +16,25 @@ import { startGamepadNav } from '../lib/gamepad.js';
 import './osd.css';
 
 const cmd = (c) => api.invoke('player:command', c).catch(() => {});
+const DIGIT_TUNE_MS = 1200; // typed channel number tunes after this pause
+
+/** Playlist index for a typed number: the provider's channel number first, else position. */
+export function channelForNumber(playlist, num) {
+  const i = playlist.findIndex((c) => c.num === num);
+  const j = i >= 0 ? i : num - 1;
+  return j >= 0 && j < playlist.length ? playlist[j] : null;
+}
+
+/** "104 — BBC One HD" while typing a channel number. */
+function ChannelBadge({ digits, playlist }) {
+  const ch = channelForNumber(playlist || [], Number(digits));
+  return (
+    <div className={`osd-digits ${ch ? '' : 'is-unknown'}`}>
+      <span className="osd-digits-num">{digits}</span>
+      {ch && <span className="osd-digits-name">— {ch.name}</span>}
+    </div>
+  );
+}
 
 export default function OsdApp() {
   const [st, setSt] = useState(null);
@@ -148,7 +167,7 @@ export default function OsdApp() {
         digitT.current = setTimeout(() => {
           setDigits('');
           cmd({ type: 'jump-num', num: Number(d) });
-        }, 1500);
+        }, DIGIT_TUNE_MS);
         return;
       }
 
@@ -260,7 +279,15 @@ export default function OsdApp() {
   const showBar = visible || st.paused;
   return (
     <div className="osd" ref={rootRef}>
-      {st.buffering && !st.error && <div className="osd-spinner" />}
+      {st.freeze && <img className="osd-freeze" src={st.freeze} alt="" />}
+      {st.buffering && !st.error && !st.freeze && <div className="osd-spinner" />}
+      {st.freeze && !st.error && (
+        <div className="osd-tuning">
+          <div className="osd-spinner-sm" />
+          Tuning to {st.item.num ? `${st.item.num} · ` : ''}
+          {st.item.name}
+        </div>
+      )}
       {st.error && (
         <div className="osd-error">
           <h2>{st.error}</h2>
@@ -268,7 +295,7 @@ export default function OsdApp() {
         </div>
       )}
       <VolumeHud />
-      {digits && <div className="osd-digits">{digits}</div>}
+      {digits && <ChannelBadge digits={digits} playlist={liveNav.playlist} />}
       {note && <div className="osd-note">{note}</div>}
       {showInfo && <StreamInfo st={st} />}
       {visible && <div className="osd-clock">{clock(now)}</div>}
