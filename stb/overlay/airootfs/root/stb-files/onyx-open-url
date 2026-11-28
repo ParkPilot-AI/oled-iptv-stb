@@ -1,0 +1,14 @@
+#!/bin/sh
+# The box's "web browser": apps such as GeForce NOW open their sign-in page with
+# the default browser (via xdg-open / the desktop portal). The box has none, so
+# this hands the address to ONYX, which shows it in a full-screen sign-in window.
+# ONYX watches $XDG_RUNTIME_DIR/onyx-open-url/ (see electron/signin.js).
+url=$1
+case $url in
+  http://* | https://*) ;;
+  *) echo "onyx-open-url: only http(s) addresses are supported" >&2; exit 1 ;;
+esac
+dir="${XDG_RUNTIME_DIR:-/tmp/onyx-$(id -u)}/onyx-open-url"
+mkdir -p "$dir" && chmod 700 "$dir" || exit 1
+tmp="$dir/.url.$$"
+printf '%s\n' "$url" >"$tmp" && mv -f "$tmp" "$dir/url.$$.$(date +%s%N)"

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ONYX sign-in window
+Comment=Shows web sign-in pages (e.g. GeForce NOW) inside ONYX
+Exec=/usr/local/bin/onyx-open-url %u
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;
+NoDisplay=true
+Terminal=false

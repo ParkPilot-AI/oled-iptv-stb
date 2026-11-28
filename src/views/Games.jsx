@@ -5,13 +5,15 @@ import { Focusable } from '../components/Focusable.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { JobModal, useProvision } from '../components/SystemUpdate.jsx';
 import { useControllers, connectedPadText } from '../lib/controllers.js';
+import { useGamepads } from '../lib/gamepad.js';
 
 /** Games: launches NVIDIA's GeForce NOW app full screen; ONYX comes back when it closes. */
 export function Games() {
   const [st, setSt] = useState(null);
   const [job, setJob] = useState(null); // 'games' | 'provision'
   const running = useStore((s) => s.gamesRunning);
-  const pads = useControllers(true);
+  const bt = useControllers(true);
+  const usbPads = useGamepads();
   const { st: prov, refresh: refreshProv } = useProvision();
   const refresh = () =>
     api
@@ -72,11 +74,14 @@ export function Games() {
       <section className="games-info">
         <div>
           <h3>Controller</h3>
-          <p>{connectedPadText(pads) || 'No controller connected — pair one in Settings → Controllers.'}</p>
+          <p>{connectedPadText(bt, usbPads) || 'No controller found. Plug one in by USB (then press any button), or pair one in Settings → Controllers.'}</p>
         </div>
         <div>
           <h3>Account</h3>
-          <p>Sign in with your NVIDIA account the first time. A free or paid membership is needed.</p>
+          <p>
+            The first time, choose Log in in GeForce NOW: NVIDIA’s sign-in page opens full screen (a USB keyboard makes typing easier) and closes by itself when
+            you’re done. Esc closes it.
+          </p>
         </div>
         <div>
           <h3>Network</h3>

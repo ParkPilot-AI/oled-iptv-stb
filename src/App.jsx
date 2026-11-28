@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff } from './lib/store.js';
+import { useStore, setState, boot, toggleFavorite, favRegistry, activateProfile, getState, powerOff, toast } from './lib/store.js';
 import { dispatchKey, dispatchKeyUp, setLongPressHandler, useBack, useKeyHandler, keyAction } from './nav/keys.js';
 import { VolumeHud, changeVolume } from './components/VolumeHud.jsx';
 import { JobModal, useProvision } from './components/SystemUpdate.jsx';
-import { startControllerWatch } from './lib/controllers.js';
+import { startControllerWatch, btJustConnected } from './lib/controllers.js';
+import { startGamepadNav, padName } from './lib/gamepad.js';
 import { api } from './lib/api.js';
 import { focusFirst, focusGroup, focusByKey } from './nav/spatial.js';
 import { NavRail } from './components/NavRail.jsx';
@@ -45,6 +46,23 @@ function MainApp() {
   const idleRef = useRef(idle);
   idleRef.current = idle;
   usePixelShift(rootRef, 120000, !gamesRunning);
+  // Game controllers (USB or Bluetooth) drive the menus like a remote.
+  useEffect(() => {
+    const stop = startGamepadNav({ enabled: () => !getState().gamesRunning });
+    const onConnect = (e) => {
+      const name = padName(e.gamepad?.id);
+      // Bluetooth pads already get a toast (with battery) from the Bluetooth watch.
+      setTimeout(() => !getState().gamesRunning && !btJustConnected() && toast(`Controller connected · ${name}`, 4000), 2500);
+    };
+    const onGone = (e) => !getState().gamesRunning && !btJustConnected(60000) && toast(`Controller disconnected · ${padName(e.gamepad?.id)}`, 4000);
+    window.addEventListener('gamepadconnected', onConnect);
+    window.addEventListener('gamepaddisconnected', onGone);
+    return () => {
+      stop();
+      window.removeEventListener('gamepadconnected', onConnect);
+      window.removeEventListener('gamepaddisconnected', onGone);
+    };
+  }, []);
   useEffect(
     () =>
       api.on('games:state', ({ running }) => {

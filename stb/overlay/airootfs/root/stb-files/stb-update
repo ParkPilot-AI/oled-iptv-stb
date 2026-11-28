@@ -78,11 +78,24 @@ install_system_files() {
   put "$src/stb-audio.sh" /usr/local/bin/stb-audio 755
   put "$src/nm-stb.conf" /etc/NetworkManager/conf.d/stb.conf 644
   put "$src/portals.conf" /etc/xdg-desktop-portal/portals.conf 644
+  put "$src/onyx-open-url" /usr/local/bin/onyx-open-url 755
   if put "$src/bluetooth-main.conf" /etc/bluetooth/main.conf 644; then
     # Only when the config changed (restarting drops connected controllers).
     systemctl try-restart bluetooth.service >/dev/null 2>&1 || true
   fi
   local home; home=$(getent passwd "$KIOSK_USER" | cut -d: -f6); home=${home:-/home/$KIOSK_USER}
+  # Files in the kiosk user's home must stay theirs (install -D makes root-owned dirs).
+  user_put() {
+    put "$1" "$2" 644 || return 1
+    local d=$p$2
+    while [[ $d != "$p$home" && $d != / && $d != . ]]; do
+      chown "$KIOSK_USER:" "$d" 2>/dev/null || true
+      d=$(dirname "$d")
+    done
+    return 0
+  }
+  user_put "$src/onyx-browser.desktop" "$home/.local/share/applications/onyx-browser.desktop" || true
+  user_put "$src/mimeapps.list" "$home/.config/mimeapps.list" || true
   if put "$src/openbox-rc.xml" "$home/.config/openbox/rc.xml" 644; then
     chown -R "$KIOSK_USER:$KIOSK_USER" "$p$home/.config/openbox" 2>/dev/null || true
     runuser -u "$KIOSK_USER" -- env DISPLAY=:0 openbox --reconfigure >/dev/null 2>&1 || true

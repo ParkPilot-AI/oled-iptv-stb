@@ -23,6 +23,7 @@ import { userDataDir } from './paths.js';
 import * as adult from './adult.js';
 import { createBluetooth } from './bluetooth.js';
 import { createGames, GFN_DOWNLOAD_URL } from './games.js';
+import { watchSignin, createSigninWindow, signinDir } from './signin.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -482,8 +483,26 @@ app.on('second-instance', () => {
   }
 });
 
+// Web sign-in pages (GeForce NOW) — the box's "browser" is ONYX; see signin.js.
+let signinWin = null;
+function openSignin(url) {
+  if (signinWin && !signinWin.isDestroyed()) {
+    signinWin.loadURL(url);
+    signinWin.focus();
+    return;
+  }
+  signinWin = createSigninWindow(BrowserWindow, url, { onClosed: () => (signinWin = null) });
+}
+
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  if (process.platform === 'linux' && hasUpdater()) {
+    try {
+      watchSignin({ dir: signinDir(), open: openSignin });
+    } catch (e) {
+      console.error('sign-in watcher:', e.message);
+    }
+  }
   handleImageProtocol();
   await createMainWindow();
   createOsdWindow(); // pre-warm so the first playback overlay appears instantly

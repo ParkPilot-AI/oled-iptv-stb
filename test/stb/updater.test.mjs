@@ -58,6 +58,9 @@ esac`
   fs.writeFileSync(path.join(build, 'stb-system', 'bluetooth-main.conf'), '[General]\nControllerMode = dual\n');
   fs.writeFileSync(path.join(build, 'stb-system', 'portals.conf'), '[preferred]\ndefault=gtk\n');
   fs.writeFileSync(path.join(build, 'stb-system', 'openbox-rc.xml'), '<openbox_config/>\n');
+  fs.writeFileSync(path.join(build, 'stb-system', 'onyx-open-url'), '#!/bin/sh\n');
+  fs.writeFileSync(path.join(build, 'stb-system', 'onyx-browser.desktop'), '[Desktop Entry]\n');
+  fs.writeFileSync(path.join(build, 'stb-system', 'mimeapps.list'), '[Default Applications]\n');
   const tarball = path.join(dir, 'app.tar.zst');
   execFileSync('tar', ['-C', build, '-I', 'zstd', '-cf', tarball, '.']);
   const tarBuf = fs.readFileSync(tarball);
@@ -174,6 +177,10 @@ test('run installs packages added since the box was set up, enables Bluetooth, i
   assert.match(fs.readFileSync(path.join(ctx.dir, 'root/etc/bluetooth/main.conf'), 'utf8'), /ControllerMode = dual/);
   assert.ok(fs.existsSync(path.join(ctx.dir, 'root/etc/xdg-desktop-portal/portals.conf')));
   assert.ok(fs.existsSync(path.join(ctx.dir, 'root/home/tv/.config/openbox/rc.xml')));
+  // Web links → ONYX sign-in window (GeForce NOW login).
+  assert.ok(fs.existsSync(path.join(ctx.dir, 'root/usr/local/bin/onyx-open-url')));
+  assert.ok(fs.existsSync(path.join(ctx.dir, 'root/home/tv/.local/share/applications/onyx-browser.desktop')));
+  assert.ok(fs.existsSync(path.join(ctx.dir, 'root/home/tv/.config/mimeapps.list')));
   assert.match(calls, /runuser -u tv -- env DISPLAY=:0 openbox --reconfigure/);
 });
 
