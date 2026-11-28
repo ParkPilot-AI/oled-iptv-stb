@@ -16,7 +16,8 @@
     "dist:linux": "npm run build:renderer && electron-builder --linux",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build:demo": "vite build --mode demo"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
