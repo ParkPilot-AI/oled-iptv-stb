@@ -155,7 +155,7 @@ export function useBecauseYouWatched(max = 2) {
       if (out.length >= max) break;
     }
     return out;
-  }, [progress, catalog]);
+  }, [progress, catalog, max]);
   const [recs, setRecs] = useState({});
   const sig = sources.map((s) => `${s.kind}:${s.id}`).join(',');
   useEffect(() => {

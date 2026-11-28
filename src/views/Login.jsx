@@ -111,7 +111,7 @@ function ProfileForm({ initial, onSaved, onCancel, canCancel }) {
   }
 
   async function remove() {
-    const ok = await confirmDialog({ title: `Delete “${initial.name}”?`, message: 'Favorites and watch progress for this playlist will be removed.', confirmLabel: 'Delete', danger: true });
+    const ok = await confirmDialog({ title: `Delete “${initial.name}”?`, message: 'Favourites and watch progress for this playlist will be removed.', confirmLabel: 'Delete', danger: true });
     if (!ok) return;
     await api.invoke('profiles:delete', initial.id);
     await refreshProfiles();

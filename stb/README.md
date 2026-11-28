@@ -23,7 +23,7 @@ sudo apt install -y docker.io
 cd iptv-player
 sudo ./stb/build.sh
 ```
-This takes about 15 minutes and needs internet. It produces `stb/out/oled-iptv-installer-YYYY.MM.DD-x86_64.iso` (about 1.3 GB).
+This takes about 15 minutes and needs internet. It produces `stb/out/oled-iptv-installer-YYYY.MM.DD-x86_64.iso` (about 1.9 GB, including an offline package repository). GitHub Actions publishes the same file on every release, e.g. `oled-iptv-installer-2026.11.28-x86_64.iso`.
 
 Write the ISO to a USB stick (any size, 4 GB or more). **Everything on the stick is erased.** Check the stick's device name with `lsblk` first:
 ```bash

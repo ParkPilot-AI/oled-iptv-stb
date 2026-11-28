@@ -3,12 +3,16 @@
 A keyboard and D-pad driven IPTV player for a Windows or Linux mini PC connected to an OLED TV. The UI is built with Electron and React. Video plays through **mpv** with hardware decoding, so HEVC/H.265, 10-bit, AC3/EAC3 and `.ts` streams all play. Nothing in the app needs a mouse.
 
 ```
-┌────────┬──────────────────────────────────────────────────────────┐
-│ ● rail │  Selected programme · live progress · synopsis              │
-│ Search │  [All] [Favourites] [UK News] …   11:30   12:00  ┊ 12:30    │
-│ Home   │  1 Metro HD  │ Antiques Hunt ▓▓┊▓▓│ Crime Files          │
-│ Live ◀ │  2 Plus      │ Quiz ▓┊ │ News at Ten     │ Crime Files    │
-└────────┴──────────────────────────────────────────────────────────┘
+┌────────────┬──────────────────────────────────────────────────────────┐
+│ O  (ONYX)  │  Selected programme · live progress · synopsis              │
+│ Home       │  [All] [Favourites] [Sports] [News] … 11:30  12:00 ┊ 12:30  │
+│ Live TV ◀  │  1 Metro HD  │ Antiques Hunt ▓▓┊▓▓│ Crime Files            │
+│ Movies     │  2 Plus      │ Quiz ▓┊ │ News at Ten     │ Crime Files      │
+│ TV Shows   │  3 Echo      │ Film: The Long Road                         │
+│ Favourites │                                                             │
+│ Search     │                                                             │
+│ ⚙ Settings │                                                             │
+└────────────┴──────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -41,7 +45,7 @@ Xtream server ──HTTP──▶ worker thread ──slim JSON──▶ main (d
 * **Catalog:** about 6 `player_api.php` calls. Each response is trimmed to the fields the UI uses and cached to `userData/profiles/<id>/catalog.json`. A cache older than the TTL is shown immediately and refreshed in the background (`catalog:updated`).
 * **EPG:** `xmltv.php` is stream-parsed. Only channels in your playlist are kept, for a window from 3 hours ago to 36 hours ahead. The index is held in memory as `{channelId: [[start, stop, title, desc]…]}`, and now/next lookups use binary search. `get_short_epg` (base64 encoded) is the fallback when a channel has no XMLTV data.
 * **Images:** the `imgcache://` protocol downloads each poster or logo once, shrinks it with `nativeImage`, stores it on disk (512 MB LRU), and serves it from disk afterwards. The renderer loads images lazily through one shared `IntersectionObserver`.
-* **Progress and favorites:** per-profile JSON documents written atomically (temp file + rename, debounced and flushed on quit). The player writes progress every 10 seconds and when playback stops. A title counts as watched at 92%.
+* **Progress and favourites:** per-profile JSON documents written atomically (temp file + rename, debounced and flushed on quit). The player writes progress every 10 seconds and when playback stops. A title counts as watched at 92%.
 * **Credentials:** passwords are encrypted with Electron `safeStorage` (DPAPI on Windows, libsecret/kwallet on Linux). On a system with no keystore they are only obfuscated, and Settings shows this.
 
 ### Spatial navigation (`src/nav/spatial.js`)
@@ -60,7 +64,7 @@ A deterministic geometric engine that moves real DOM focus:
 
 ### OLED care
 
-* Pure `#000` backgrounds, `#121212` cards, `#F5F5F5` text, and a single accent colour you can change.
+* Pure `#000` backgrounds, `#0c0c0e` cards, `#F5F5F5` / `#8E8E93` text. The theme colour (Settings → General → Theme) only appears on things that move — the focus ring, the selected tab, progress — and LIVE is always red.
 * The OSD and banners auto-hide after 4 seconds (configurable).
 * If playback is paused for 3 minutes (configurable), a pure-black screensaver appears with a dim clock that jumps to a new spot every 20 seconds. The menu UI gets the same screensaver after 10 idle minutes.
 * The whole UI shifts by 1–2 px every 2 minutes (every 1 minute on the OSD) to spread wear from static elements.
@@ -72,46 +76,63 @@ A deterministic geometric engine that moves real DOM focus:
 
 ```
 electron/
-  main.js              windows, IPC handlers, lifecycle
+  main.js              windows, IPC handlers, lifecycle (userData kept in "OLED IPTV", see paths.js)
   preload.cjs          sandboxed whitelist bridge → window.iptv
-  xtream.js            API URLs, stream URLs, auth, payload normalisers
+  paths.js             user-data folder (unchanged by the ONYX rename)
+  xtream.js            API URLs, stream URLs, auth, payload normalisers, friendly network errors
   xmltv.js             streaming XMLTV parser + EPG index helpers
-  catalog.js           worker orchestration, disk/memory caches, EPG queries
+  catalog.js           worker orchestration, disk/memory caches, EPG queries, logos + channel types
   workers/catalog-worker.js
-  mpv.js               mpv spawn + JSON IPC client + input.conf
-  player.js            playback session: playlist, zapping, auto-advance, progress, retries
+  mpv.js               mpv spawn + JSON IPC client + input.conf; resolveTool (mpv, yt-dlp)
+  player.js            playback session: playlist, zapping, auto-advance, progress, retries, trailers
+  mpvprops.js          picture/sound settings → mpv properties
+  subs.js              subtitle choice + style       tracks.js   "Audio: English · AC3 5.1 (2/3)"
+  audio.js             PipeWire outputs, system volume
+  artwork.js           TMDB client + artwork cache   artmatch.js  title cleaning, logo matching, genres
+  discover.js          TMDB trending/popular/top-rated/genre lists, recommendations
+  trailers.js          TMDB trailer choice + yt-dlp stream resolution
+  adult.js             adult-channel PIN (hashed)
   imageCache.js        imgcache:// protocol (download → resize → disk)
   store.js             profiles (encrypted), settings, per-profile docs
+  data/tvlogos.json    index of official channel logos (scripts/update-tvlogos.mjs)
 src/
-  nav/spatial.js       focus engine          nav/keys.js   key map + handler stacks
-  components/          Focusable, VirtualGrid, VirtualKeyboard/TextField, Cards,
-                       NavRail, Modal/Confirm/Toast, Screensaver, Icons
-  views/               Login, Home, LiveTV, Library (Movies/Series), MovieDetail,
+  nav/spatial.js       focus engine          nav/keys.js   key map, handler stacks, long-press OK
+  components/          Focusable, VirtualGrid, VirtualKeyboard/TextField (+ number pad), Cards,
+                       Hub (spotlight carousel + rows), PillTabs, NavRail, Modal/Confirm/Toast,
+                       NetworkSettings (Wi-Fi), SystemUpdate, AdultSettings, TrailerButton,
+                       VolumeHud, Logo, Screensaver, Icons
+  views/               Login, Home, LiveTV, Library (Movies/TV Shows), MovieDetail,
                        SeriesDetail, Favorites, Search, Settings
-  osd/OsdApp.jsx       player overlay (banner, VOD bar, stream info, digits, screensaver)
-  lib/                 api bridge (+ mockApi for browser dev), store, epg hooks, search
-test/                  unit tests + mpv IPC integration test; e2e/ mock Xtream server
-resources/mpv/         put mpv.exe here for Windows builds
+  osd/                 OsdApp (player overlay), Bars (live banner, VOD bar), LiveNav (surf + glass guide)
+  lib/                 api bridge (mockApi only in demo builds), store (+ adult filter), art,
+                       discover, genres, theme, epg hooks, search, fav
+test/                  unit tests + mpv IPC test; stb/ updater + Wi-Fi tests; e2e/ mock Xtream server
+stb/                   Arch set-top box: ISO build (build.sh, container-build.sh), installer,
+                       box files (stb-update helper, NetworkManager, audio, openbox)
+resources/mpv/         mpv.exe (and yt-dlp.exe) for Windows builds
 ```
 
 ---
 
 ## 3. Setup and build
 
-Requires Node 20+.
+Requires Node 22+.
 
 ```bash
 npm install
 npm run dev          # Vite + Electron with hot reload
 npm run dev:web      # UI only in a browser, with a 10k-channel demo backend (no mpv)
 npm test             # unit tests + real-mpv IPC test (skipped if mpv/ffmpeg missing)
+npm run lint         # ESLint (also run in CI before any release is published)
+npm run format       # Prettier (single quotes, 160 columns)
+npm run build:demo   # browser demo bundle (the Electron build never includes the demo data)
 ```
 
 ### Installing / bundling mpv
 
 * **Windows (recommended for the OptiPlex):** download a current build from <https://github.com/shinchiro/mpv-winbuild-cmake/releases> (`mpv-x86_64-v3-*.7z`). Put `mpv.exe` in `resources/mpv/win/`, then run:
   ```bash
-  npm run dist:win     # → release/OLED IPTV-1.0.0-x64.exe (installer) + portable exe
+  npm run dist:win     # → release/ONYX-1.1.0-x64.exe (installer) + portable exe
   ```
 * **Linux:** install the system package (`sudo apt install mpv`). Run `npm run dist:linux` to build an AppImage and a `.deb` (the `.deb` declares mpv as a dependency).
 * You can also point to any mpv binary under **Settings → Custom mpv path**.
@@ -139,14 +160,20 @@ node test/e2e/mock-xtream.mjs     # 300 channels + EPG + 1 movie + 1 series
 | Key | Menus | Playback |
 |---|---|---|
 | Arrows | Move focus | Live: ▲/▼ channel surf (tunes after 1.8 s or on OK), ◀ glass channel guide over the video · VOD: ◀▶ ±10 s (30 s when held), ▲▼ ±60 s |
-| Enter | Select | Show/hide OSD · confirm a typed channel number |
+| Enter (OK) | Select | Films/episodes: pause/play and show the bar · Live: show/hide the banner, confirm a typed channel number |
+| Hold OK (~0.6 s) | Add/remove the focused card in Favourites | — |
 | Esc / Backspace | Back one level (Back at the top level asks before exiting) | Close info/OSD, then stop |
 | PageUp / PageDown (ChannelUp/Down) | Home & Movies/Series: cycle hub tabs · Live guide: page channels | Next / previous channel or episode (instant) |
 | Space / MediaPlayPause | — | Play/pause |
-| F | Toggle favorite on the focused item | Toggle favorite on the playing item |
+| F | Add/remove the focused item in Favourites | Same for the playing channel or film; on an episode, its series |
 | I | — | Stream info (resolution, codecs, fps, bitrates, HW decoding) |
 | 0–9 | — | Jump to a channel number (Live) |
-| A / S | — | Next audio track / subtitle track |
+| A / S | — | Next audio track / subtitle track, named on screen ("Audio: English · AC3 5.1 (2/3)", "Subtitles: Off") |
+| Volume Up / Down / Mute | Box volume | Box volume |
+
+**Trailers:** film and series pages have a **Trailer** button when TMDB lists one. It plays full screen in mpv straight from YouTube's video servers through yt-dlp — no YouTube page, no ads — and Back (or the end) returns to the page. Needs a TMDB key and yt-dlp; Settings → Library → Trailers turns it off.
+
+**Adult channels** are hidden by default (Settings → General → Parental), optionally behind a 4-digit PIN.
 
 In text fields and on Search, typing on a physical keyboard goes straight in, and Backspace deletes a character (Esc still goes back).
 
@@ -169,10 +196,10 @@ Changes apply to what's playing. **Volume Up / Down / Mute** keys change the box
 
 ## 5. Artwork
 
-* **Channel logos** come from the open [iptv-org](https://github.com/iptv-org/api) database, with no key needed. Channels are matched by EPG id first, then by name (ignoring "UK:", "HD", "4K" and similar), using the country prefix to tell apart channels that share a name. Matching runs in the background worker and is refreshed weekly.
-* **Movie and series artwork** (posters, wide backdrops, title logos) comes from [TMDB](https://www.themoviedb.org). Enter your free API key under **Settings → Artwork**; either the v3 key or the v4 read token works. The TMDB id from the provider is used when available, otherwise the cleaned title and year. Results are cached on disk for 30 days (misses for 7).
-* Each source has a mode: *Fill gaps* (provider artwork first), *Prefer* (the external source first) or *Off*.
-* Attribution for TMDB and iptv-org is shown in Settings → About.
+* **Channel logos:** official 512 px logos from [tv-logo/tv-logos](https://github.com/tv-logo/tv-logos) first (about 10,000; the index ships in `electron/data/tvlogos.json` and is refreshed at build time — free for personal use, ask its maintainer before distributing), then the open [iptv-org](https://github.com/iptv-org/api) database, then the provider's own logo. Matching (EPG id, then name without "UK:", "HD", "+1"…, using the country prefix) runs in the background worker and is refreshed weekly. The same pass sorts channels into types for the guide.
+* **Movie and series artwork** (posters, wide backdrops, title logos) comes from [TMDB](https://www.themoviedb.org). Enter your free API key under **Settings → Library**; the v3 key or the v4 read token works. The provider's TMDB id is used when it has one, otherwise the cleaned title and year. Results are cached on disk for 30 days (misses for 7). Trailer choices share that cache.
+* Modes: *TMDB first* (default) / *Provider first* / *Off* for artwork; *Official logos* / *Provider first* / *Provider logos only* for channel logos.
+* Attribution for TMDB, tv-logos and iptv-org is shown in Settings → Library.
 
 ## 6. Dedicated set-top box (Arch Linux)
 

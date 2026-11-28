@@ -40,7 +40,7 @@ const backdropArt = (seed) => art(seed + 3, 1600, 900, '');
 function makeCatalog() {
   const r = rnd(42);
   const pick = (a) => a[Math.floor(r() * a.length)];
-  const liveCats = ['UK | Entertainment', 'UK | Sports', 'UK | News', 'US | Entertainment', 'US | Sports', 'DE | Allgemein', 'FR | Général', 'Kids', 'Documentary', 'Music', '4K UHD', 'PPV Events']
+  const liveCats = ['UK | Entertainment', 'UK | Sports', 'UK | News', 'US | Entertainment', 'US | Sports', 'DE | Allgemein', 'FR | Général', 'Kids', 'Documentary', 'Music', '4K UHD', 'PPV Events', 'Adult 18+']
     .concat(Array.from({ length: 28 }, (_, i) => `Region ${i + 1}`))
     .map((name, i) => ({ id: String(i + 1), name }));
   const live = Array.from({ length: 10000 }, (_, i) => ({
@@ -128,7 +128,7 @@ export function createMockApi() {
   const emit = (ch, data) => listeners.get(ch)?.forEach((cb) => cb(data));
   let catalog = null;
   let vol = { volume: 60, muted: false };
-  let settings = { overscan: 0, tmdbKey: '', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, theme: 'amber', audioDevice: 'auto', subMode: 'off', brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', audioLang: 'auto', audioDelayMs: 0, nightMode: 'off', passthrough: false, speakers: 'auto', artSource: 'prefer', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
+  let settings = { overscan: 0, tmdbKey: '', logoSource: 'missing', liveFormat: 'ts', hwdec: 'auto-safe', deinterlace: false, mpvPath: '', catalogTtlHours: 12, epgTtlHours: 6, osdTimeoutSec: 4, screensaverMin: 3, startFullscreen: true, theme: 'amber', trailers: true, audioDevice: 'auto', subMode: 'off', brightness: 0, contrast: 0, saturation: 0, gamma: 0, aspect: 'auto', upscaling: 'standard', deband: false, toneMapping: 'auto', audioLang: 'auto', audioDelayMs: 0, nightMode: 'off', passthrough: false, speakers: 'auto', artSource: 'prefer', subLang: 'en', subSize: 'medium', subBackground: 'box', ...ls.get('settings', {}) };
   const profiles = ls.get('profiles', { activeId: null, list: [] });
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const wifi = {
@@ -141,7 +141,7 @@ export function createMockApi() {
   };
 
   const handlers = {
-    'app:info': () => ({ version: '1.0.0-web', platform: 'web', mpvPath: null, dataDir: '(browser)', build: '2026.11.27-a0acc2f', updater: true }),
+    'app:info': () => ({ version: '1.0.0-web', platform: 'web', mpvPath: null, ytdlpPath: '/usr/bin/yt-dlp', dataDir: '(browser)', build: '2026.11.27-a0acc2f', updater: true }),
     'app:quit': () => emit('mock:quit'),
     'system:poweroff': () => emit('mock:quit'),
     'volume:change': ({ action }) => {
@@ -170,7 +170,20 @@ export function createMockApi() {
       ls.set('profiles', profiles);
       return { user: { status: 'Active', expires: Date.now() + 90 * 864e5, maxConnections: 2 } };
     },
-    'settings:get': () => settings,
+    'settings:get': () => ({ ...settings, adultPinSet: !!settings.adultPin }),
+    'adult:show': ({ show, pin }) => {
+      if (show && settings.adultPin && pin !== settings.adultPin) throw new Error('Wrong PIN');
+      settings = { ...settings, showAdult: !!show };
+      ls.set('settings', settings);
+      return { ...settings, adultPinSet: !!settings.adultPin };
+    },
+    'adult:pin': ({ pin, current }) => {
+      if (settings.adultPin && current !== settings.adultPin) throw new Error('Wrong PIN');
+      if (pin && !/^\d{4}$/.test(pin)) throw new Error('The PIN must be 4 digits');
+      settings = { ...settings, adultPin: pin || '' };
+      ls.set('settings', settings);
+      return { ...settings, adultPinSet: !!settings.adultPin };
+    },
     'audio:outputs': async () => {
       await wait(300);
       return { backend: 'pactl', current: settings.audioDevice || 'auto', outputs: [
@@ -181,9 +194,10 @@ export function createMockApi() {
       ] };
     },
     'settings:update': (patch) => {
-      settings = { ...settings, ...patch };
+      const { showAdult: _a, adultPin: _p, ...safe } = patch || {};
+      settings = { ...settings, ...safe };
       ls.set('settings', settings);
-      return settings;
+      return { ...settings, adultPinSet: !!settings.adultPin };
     },
     'catalog:load': async () => {
       emit('catalog:progress', { stage: 'categories' });
@@ -208,7 +222,7 @@ export function createMockApi() {
     'epg:short': () => [],
     'vod:info': async ({ item }) => {
       await wait(150);
-      return { ...item, backdrop: item.icon ? backdropArt(item.id) : '', plot: 'A gripping demo synopsis that runs for a couple of lines to check wrapping and readability from ten feet away on a large OLED panel.', cast: 'Ada Lovelace, Alan Turing, Grace Hopper', director: 'Demo Director', genre: 'Drama, Thriller', year: '2024', duration: 6420, backdrop: '' };
+      return { ...item, plot: 'A gripping demo synopsis that runs for a couple of lines to check wrapping and readability from ten feet away on a large OLED panel.', cast: 'Ada Lovelace, Alan Turing, Grace Hopper', director: 'Demo Director', genre: 'Drama, Thriller', year: '2024', duration: 6420, backdrop: '' };
     },
     'series:info': async ({ item }) => {
       await wait(150);
@@ -297,9 +311,22 @@ export function createMockApi() {
       if (!key || key.length < 20) throw new Error('TMDB rejected the API key');
       return true;
     },
-    'art:refreshLogos': () => null,
+    'art:refreshLogos': async () => {
+      await wait(1500);
+      return { hits: 8123, total: 10000 };
+    },
     'doc:get': ({ profileId, name }) => ls.get(`${profileId}:${name}`, {}),
     'doc:set': ({ profileId, name, data }) => ls.set(`${profileId}:${name}`, data),
+    'trailer:get': async ({ item }) => {
+      await wait(200);
+      return settings.tmdbKey && settings.trailers !== false && item?.id % 3 !== 0 ? { available: true, name: 'Official Trailer' } : { available: false };
+    },
+    'trailer:play': async ({ item, title }) => {
+      // Browser demo: no mpv. Simulate a short trailer and come back to the page.
+      console.info('[mock] trailer', title, item);
+      await wait(400);
+      setTimeout(() => emit('player:closed', { reason: 'ended', item: { kind: 'trailer', name: title } }), 1200);
+    },
     'player:play': async (args) => {
       // Browser mode cannot launch mpv: simulate a short session.
       console.info('[mock] play', args.items[args.index]);

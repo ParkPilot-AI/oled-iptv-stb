@@ -3,10 +3,12 @@
 // progress persistence and state broadcasting to the transparent OSD window.
 import path from 'node:path';
 import fsp from 'node:fs/promises';
-import { Mpv, buildMpvArgs, makeIpcPath, resolveMpvBinary, INPUT_CONF } from './mpv.js';
+import { Mpv, buildMpvArgs, makeIpcPath, resolveMpvBinary, resolveTool, INPUT_CONF } from './mpv.js';
 import { streamUrl } from './xtream.js';
 import { pickSubtitle, subStyleProps } from './subs.js';
 import { videoProps, audioProps } from './mpvprops.js';
+import { describeTrack } from './tracks.js';
+import { mpvStartArgs } from './trailers.js';
 import { getCredentials, getSettings, getDoc, setDoc, peekDoc, dataDir } from './store.js';
 
 const PROGRESS_EVERY_MS = 10000;
@@ -47,7 +49,14 @@ export class Player {
     const mpv = new Mpv({
       binary,
       ipcPath,
-      args: buildMpvArgs({ ipcPath, inputConf, hwdec: settings.hwdec, deinterlace: settings.deinterlace }),
+      args: buildMpvArgs({
+        ipcPath,
+        inputConf,
+        hwdec: settings.hwdec,
+        deinterlace: settings.deinterlace,
+        // Trailers fall back to mpv's ytdl hook; point it at the same yt-dlp.
+        extra: mpvStartArgs(resolveTool('yt-dlp', { customPath: settings.ytdlpPath, resourcesPath: this.ui.resourcesPath })),
+      }),
     });
     mpv.on('property', (n, v) => this._onProperty(n, v));
     mpv.on('event', (e) => this._onEvent(e));
@@ -102,7 +111,7 @@ export class Player {
   /** Start a session. items: [{kind,id,name,ext,...}], index: start position. */
   async play({ profileId, items, index = 0, resume = true }) {
     if (!items?.length) throw new Error('Nothing to play');
-    const creds = await getCredentials(profileId);
+    const creds = items.every((it) => it.kind === 'trailer') ? null : await getCredentials(profileId);
     const settings = await getSettings();
     const progress = await getDoc(profileId, 'progress');
     this.session = { profileId, creds, settings, items, index, progress };
@@ -119,8 +128,8 @@ export class Player {
   async _loadCurrent({ resume = true, autoNext = false } = {}) {
     const s = this.session;
     const item = s.items[s.index];
-    const url = streamUrl(s.creds, item, { liveFormat: s.settings.liveFormat });
-    const saved = s.progress[`${item.kind}:${item.id}`];
+    const url = this._urlFor(item);
+    const saved = item.kind === 'trailer' ? null : s.progress[`${item.kind}:${item.id}`];
     const start = resume && item.kind !== 'live' && saved && !saved.watched && saved.pos > 15 ? saved.pos - 5 : null;
     this.retries = 0;
     this.state = {
@@ -148,7 +157,25 @@ export class Player {
     this._broadcast(true);
     await this.mpv.set('pause', false).catch(() => {});
     await this.mpv.set('sid', 'no').catch(() => {}); // chosen on file-loaded from the user's prefs
+    await this._prepareTrailer(item);
     await this.mpv.load(url, { start });
+  }
+
+  _urlFor(item) {
+    if (item.kind === 'trailer') return item.load.url;
+    return streamUrl(this.session.creds, item, { liveFormat: this.session.settings.liveFormat });
+  }
+
+  /**
+   * Trailers come as separate video + audio streams: the audio is attached through
+   * the audio-files option before loadfile (works the same on mpv < 0.38 and ≥ 0.38,
+   * whose loadfile gained an index argument before the per-file options).
+   */
+  async _prepareTrailer(item) {
+    const t = item.kind === 'trailer' ? item.load : null;
+    if (t?.audio) await this.mpv.command('change-list', 'audio-files', 'set', t.audio).catch(() => {});
+    else await this.mpv.command('change-list', 'audio-files', 'clr', '').catch(() => {});
+    for (const [k, v] of t?.props || []) await this.mpv.set(k, v).catch(() => {});
   }
 
   _onProperty(name, v) {
@@ -233,6 +260,7 @@ export class Player {
     const s = this.session;
     const item = s.items[s.index];
     if (item.kind === 'live') return this._onError('stream ended');
+    if (item.kind === 'trailer') return this.stop({ reason: 'ended' }); // back to the detail page
     // Providers often just close the connection mid-film, which mpv reports as
     // end-of-file. Only treat it as finished near the real end; otherwise reconnect.
     const st = this.state;
@@ -257,8 +285,7 @@ export class Player {
       this._broadcast(true);
       setTimeout(() => {
         if (this.state === st) {
-          const url = streamUrl(this.session.creds, st.item, { liveFormat: this.session.settings.liveFormat });
-          this.mpv?.load(url, { start: st.kind === 'live' ? null : st.pos }).catch(() => {});
+          this.mpv?.load(this._urlFor(st.item), { start: st.kind === 'live' ? null : st.pos }).catch(() => {});
         }
       }, 1500 * this.retries);
       return;
@@ -289,7 +316,7 @@ export class Player {
   _saveProgress({ watched = false } = {}) {
     const s = this.session;
     const st = this.state;
-    if (!s || !st || st.kind === 'live' || !st.pos) return;
+    if (!s || !st || st.kind === 'live' || st.kind === 'trailer' || !st.pos) return; // trailers never count
     this.lastProgressSave = Date.now();
     const dur = st.dur > st.pos ? st.dur : 0; // ignore nonsense durations from some streams
     const key = `${st.kind}:${st.item.id}`;
@@ -350,9 +377,20 @@ export class Player {
         return this._loadCurrent({ resume: true });
       }
       case 'cycle-audio':
-        return mpv.command('cycle', 'aid');
-      case 'cycle-sub':
-        return mpv.command('cycle', 'sid');
+      case 'cycle-sub': {
+        // Returns e.g. { message: 'Audio: English · AC3 5.1 (2/3)' } for the OSD to show.
+        const type = cmd.type === 'cycle-audio' ? 'audio' : 'sub';
+        if (type === 'audio') {
+          // Step through the audio tracks only — never to "no audio".
+          const before = (await mpv.get('track-list').catch(() => [])).filter((t) => t.type === 'audio');
+          const i = before.findIndex((t) => t.selected);
+          if (before.length) await mpv.set('aid', before[(i + 1) % before.length].id);
+        } else {
+          await mpv.command('cycle', 'sid'); // includes "off"
+        }
+        const tracks = await mpv.get('track-list').catch(() => []);
+        return { message: describeTrack(tracks, type) };
+      }
       case 'volume':
         return mpv.command('add', 'volume', cmd.delta);
       case 'stop':

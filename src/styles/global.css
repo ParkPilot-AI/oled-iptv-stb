@@ -2066,3 +2066,20 @@ small {
   color: #000;
   background: var(--badge);
 }
+
+/* Number pad (PIN entry) */
+.vkb-digits .vkb-key {
+  width: 5.5rem;
+}
+.vkb-digits .vkb-done {
+  width: 5.5rem;
+}
+
+.pin-modal {
+  width: auto;
+  min-width: 26rem;
+}
+
+.setting-row.is-static {
+  color: var(--muted);
+}

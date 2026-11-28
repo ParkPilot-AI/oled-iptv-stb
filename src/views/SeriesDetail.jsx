@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, play, toggleFavorite, isFavorite, episodePlaylist } from '../lib/store.js';
 import { Focusable } from '../components/Focusable.jsx';
 import { LazyImg } from '../components/Cards.jsx';
+import { TrailerButton } from '../components/TrailerButton.jsx';
 import { Icon } from '../components/Icons.jsx';
 import { VirtualList } from '../components/VirtualGrid.jsx';
 import { DetailOverlay, useDetailInfo } from './MovieDetail.jsx';
@@ -48,9 +49,10 @@ export function SeriesDetail({ item }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info]);
 
+  const loaded = !!info;
   useEffect(() => {
     requestAnimationFrame(() => focusFirst(ref.current));
-  }, [!!info]);
+  }, [loaded]);
 
   const season = info?.seasons[seasonIdx];
   const playEpisode = (ep) => play(playlist, Math.max(0, playlist.findIndex((x) => x.id === ep.id)));
@@ -73,8 +75,9 @@ export function SeriesDetail({ item }) {
                 <Icon name="play" /> {resume.label}
               </Focusable>
             )}
+            <TrailerButton item={item} tmdbId={info?.tmdbId} title={item.name} data-nav-right=".seasons [data-focus-default]" />
             <Focusable className={`btn ${fav ? 'is-on' : ''}`} data-nav-right=".seasons [data-focus-default]" onSelect={() => toggleFavorite(item)}>
-              <Icon name="star" /> {fav ? 'In Favorites' : 'Add to Favorites'}
+              <Icon name="star" /> {fav ? 'In Favourites' : 'Add to Favourites'}
             </Focusable>
           </div>
         </div>

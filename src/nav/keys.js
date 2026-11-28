@@ -105,6 +105,29 @@ export function runBack() {
   return false;
 }
 
+// ----- long press OK (≈600 ms) on a card with a favourite item -----
+// OK on such a card selects on key *release*; holding it instead calls the long-press
+// handler (Favourites). Everything else still selects on key press.
+export const LONG_PRESS_MS = 600;
+let longPress = null;
+let hold = null;
+export function setLongPressHandler(fn) {
+  longPress = fn;
+}
+function cancelHold() {
+  if (hold) clearTimeout(hold.timer);
+  hold = null;
+}
+if (typeof window !== 'undefined') window.addEventListener('blur', cancelHold);
+
+/** keyup half of OK: a short press on a favouritable card selects it here. */
+export function dispatchKeyUp(e) {
+  if (keyAction(e) !== 'enter' || !hold) return;
+  const { el, fired } = hold;
+  cancelHold();
+  if (!fired && document.activeElement === el) el.click();
+}
+
 /** Global dispatcher; install once at the app root. */
 export function dispatchKey(e, { onAnyKey } = {}) {
   if (e.ctrlKey || e.metaKey || (e.altKey && e.key !== 'Alt')) return;
@@ -125,9 +148,22 @@ export function dispatchKey(e, { onAnyKey } = {}) {
     case 'right':
       move(action);
       break;
-    case 'enter':
-      if (!e.repeat) document.activeElement?.click?.();
+    case 'enter': {
+      if (e.repeat) break;
+      const el = document.activeElement;
+      if (longPress && el?.dataset?.fav) {
+        cancelHold();
+        hold = { el, fired: false };
+        hold.timer = setTimeout(() => {
+          if (!hold || hold.el !== el) return;
+          hold.fired = true;
+          longPress(el);
+        }, LONG_PRESS_MS);
+        break;
+      }
+      el?.click?.();
       break;
+    }
     case 'back':
       if (!e.repeat) runBack();
       break;

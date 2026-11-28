@@ -15,9 +15,12 @@ import * as catalog from './catalog.js';
 import { authenticate, normalizeServer } from './xtream.js';
 import { registerImageScheme, handleImageProtocol, pruneImageCache, clearImageCache } from './imageCache.js';
 import { Player } from './player.js';
-import { getArtwork, testTmdbKey, clearArtworkCache } from './artwork.js';
-import { resolveMpvBinary } from './mpv.js';
+import { getArtwork, testTmdbKey, clearArtworkCache, tmdb, artCacheGet, artCachePut } from './artwork.js';
+import { createTrailers, trailerLoad } from './trailers.js';
+import { resolveMpvBinary, resolveTool } from './mpv.js';
 import * as audio from './audio.js';
+import { userDataDir } from './paths.js';
+import * as adult from './adult.js';
 import * as discover from './discover.js';
 import { PICTURE_DEFAULTS } from './mpvprops.js';
 
@@ -32,7 +35,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 
 // Optional override (portable installs, tests): keep all data in a given folder.
-if (process.env.IPTV_USER_DATA) app.setPath('userData', process.env.IPTV_USER_DATA);
+// Keep the pre-ONYX data folder (profiles, settings, favourites) — see electron/paths.js.
+app.setPath('userData', userDataDir(app.getPath('appData'), process.env.IPTV_USER_DATA));
 if (!app.requestSingleInstanceLock()) app.quit();
 registerImageScheme();
 // Keep animations smooth on integrated GPUs; never throttle the overlay.
@@ -142,6 +146,7 @@ function runUpdate() {
     buf += d;
     let i;
     while ((i = buf.indexOf('\n')) !== -1) {
+      // eslint-disable-next-line no-control-regex -- strip ANSI colour codes
       const line = buf.slice(0, i).replace(/\x1b\[[0-9;]*m/g, '');
       buf = buf.slice(i + 1);
       if (!line.trim()) continue;
@@ -225,6 +230,21 @@ const player = new Player({
   },
 });
 
+// ---------- trailers ----------
+const ytdlpPath = async () => resolveTool('yt-dlp', { customPath: (await store.getSettings()).ytdlpPath, resourcesPath: process.resourcesPath });
+const trailers = createTrailers({
+  findTmdbId: async (item) => item.tmdbId || (await getArtwork(item).catch(() => null))?.tmdbId || null,
+  tmdb: async (p, params) => tmdb(p, params, ((await store.getSettings()).tmdbKey || '').trim()),
+  cacheGet: artCacheGet,
+  cachePut: artCachePut,
+  ytdlpPath,
+});
+const trailersOn = async () => {
+  const s = await store.getSettings();
+  return !!(s.tmdbKey || '').trim() && s.trailers !== false;
+};
+const titleItem = (it) => ({ kind: it?.kind, id: it?.id, name: it?.name, year: it?.year, tmdbId: it?.tmdbId });
+
 // ---------- IPC ----------
 const handlers = {
   'app:info': async () => {
@@ -233,6 +253,7 @@ const handlers = {
       version: app.getVersion(),
       platform: process.platform,
       mpvPath: resolveMpvBinary({ customPath: s.mpvPath, resourcesPath: process.resourcesPath }),
+      ytdlpPath: resolveTool('yt-dlp', { customPath: s.ytdlpPath, resourcesPath: process.resourcesPath }),
       build: (() => {
         try {
           return fs.readFileSync(path.join(path.dirname(process.execPath), 'stb-version.txt'), 'utf8').trim();
@@ -291,13 +312,16 @@ const handlers = {
     return authenticate(await store.getCredentials(id)).catch((e) => ({ error: e.message }));
   },
 
-  'settings:get': () => store.getSettings(),
+  'settings:get': async () => adult.publicSettings(await store.getSettings()),
   'settings:update': async (patch) => {
+    patch = Object.fromEntries(Object.entries(patch || {}).filter(([k]) => !adult.PROTECTED_KEYS.includes(k)));
     if ('audioDevice' in patch) await audio.applyOutput(patch.audioDevice);
     const s = await store.updateSettings(patch);
     if (Object.keys(patch).some((k) => LIVE_KEYS.has(k))) await player.applySettings(s);
-    return s;
+    return adult.publicSettings(s);
   },
+  'adult:show': async (arg) => adult.publicSettings(await store.updateSettings(adult.showAdultPatch(await store.getSettings(), arg || {}))),
+  'adult:pin': async (arg) => adult.publicSettings(await store.updateSettings(adult.pinPatch(await store.getSettings(), arg || {}))),
   'volume:change': async ({ action }) => {
     let r = await audio.systemVolume(action).catch(() => null);
     if (!r && player.mpv) r = await player.volume(action); // Windows/macOS: mpv's own volume
@@ -331,8 +355,18 @@ const handlers = {
   'art:get': (q) => getArtwork(q),
   'art:testKey': (key) => testTmdbKey(key),
   'discover:lists': ({ kind, names }) => discover.getLists(kind, names),
+  'trailer:get': async ({ item }) => ((await trailersOn()) ? trailers.get(titleItem(item)) : { available: false }),
+  'trailer:play': async ({ profileId, item, title }) => {
+    const t = await trailers.prepare(titleItem(item));
+    if (!t) throw new Error('No trailer found');
+    const trailer = { kind: 'trailer', id: `yt:${t.key}`, name: title || item.name, load: trailerLoad(t), from: { kind: item.kind, id: item.id } };
+    await player.play({ profileId, items: [trailer], index: 0, resume: false });
+  },
   'discover:recs': ({ item }) => discover.getRecommendations(item),
-  'art:refreshLogos': ({ profileId }) => catalog.refreshLogos(profileId, sendMain, { force: true }),
+  'art:refreshLogos': async ({ profileId }) => {
+    if ((await store.getSettings()).logoSource === 'off') throw new Error('Channel logos are set to "Provider logos only"');
+    return catalog.refreshLogos(profileId, sendMain, { force: true });
+  },
   'doc:get': ({ profileId, name }) => store.getDoc(profileId, name),
   'doc:set': ({ profileId, name, data }) => store.setDoc(profileId, name, data),
 

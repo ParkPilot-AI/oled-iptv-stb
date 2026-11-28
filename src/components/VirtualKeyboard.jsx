@@ -11,11 +11,14 @@ const LAYOUTS = {
   sym: ['1234567890', '!#$%&*()/:', '+=?;\'",~|\\'],
 };
 
-export function VirtualKeyboard({ value, onChange, onDone, mask = false, placeholder = '', showValue = true, doneLabel = 'Done', group = 'vkb', urlKeys = false, active = true }) {
+export function VirtualKeyboard({ value, onChange, onDone, mask = false, placeholder = '', showValue = true, doneLabel = 'Done', group = 'vkb', urlKeys = false, active = true, digits = false, maxLength = Infinity }) {
   const [layout, setLayout] = useState('abc');
   const [shift, setShift] = useState(false);
 
-  const insert = (ch) => onChange(value + ch);
+  const insert = (ch) => {
+    if (digits && !/^\d$/.test(ch)) return;
+    if (value.length < maxLength) onChange(value + ch);
+  };
   const backspace = () => onChange(value.slice(0, -1));
 
   // Physical keyboard typing.
@@ -25,6 +28,7 @@ export function VirtualKeyboard({ value, onChange, onDone, mask = false, placeho
         backspace();
         return true;
       }
+      if (digits && !/^\d$/.test(e.key) && e.key.length === 1) return true; // swallow letters
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
         // Space/letters would otherwise map to play/fav/info actions.
         insert(e.key);
@@ -36,6 +40,44 @@ export function VirtualKeyboard({ value, onChange, onDone, mask = false, placeho
   );
 
   const rows = LAYOUTS[layout].map((r) => [...r].map((c) => (shift && layout === 'abc' ? c.toUpperCase() : c)));
+  // PINs are fully hidden; other masked fields briefly show the last character typed.
+  const shown = value ? (mask ? (digits ? '•'.repeat(value.length) : '•'.repeat(value.length - 1) + value.slice(-1)) : value) : placeholder;
+
+  if (digits) {
+    // Number pad: 1–9, then ⌫ 0 Done.
+    return (
+      <div className="vkb vkb-digits" data-focus-group={group}>
+        {showValue && (
+          <div className={`vkb-value ${value ? '' : 'is-empty'}`}>
+            {shown}
+            <span className="caret" />
+          </div>
+        )}
+        {['123', '456', '789'].map((r, ri) => (
+          <div className="vkb-row" key={r}>
+            {[...r].map((c, ci) => (
+              <Focusable key={c} className="vkb-key" onSelect={() => insert(c)} autoFocus={ri === 0 && ci === 0}>
+                {c}
+              </Focusable>
+            ))}
+          </div>
+        ))}
+        <div className="vkb-row">
+          <Focusable className="vkb-key" onSelect={backspace}>
+            <Icon name="backspace" />
+          </Focusable>
+          <Focusable className="vkb-key" onSelect={() => insert('0')}>
+            0
+          </Focusable>
+          {onDone && (
+            <Focusable className="vkb-key vkb-done" onSelect={onDone}>
+              {doneLabel}
+            </Focusable>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="vkb" data-focus-group={group}>

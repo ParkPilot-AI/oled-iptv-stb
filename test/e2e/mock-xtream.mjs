@@ -44,8 +44,7 @@ http
       res.setHeader('content-type', 'image/png');
       return fs.createReadStream(path.join(MEDIA, 'icon.png')).pipe(res);
     }
-    let m;
-    if ((m = /^\/live\/u\/pw\/(\d+)\.ts$/.exec(u.pathname))) return fs.createReadStream(path.join(MEDIA, 'live.ts')).pipe(res);
+    if (/^\/live\/u\/pw\/(\d+)\.ts$/.test(u.pathname)) return fs.createReadStream(path.join(MEDIA, 'live.ts')).pipe(res);
     if (/^\/(movie|series)\/u\/pw\/\d+\.mp4$/.test(u.pathname)) {
       res.setHeader('content-type', 'video/mp4');
       return fs.createReadStream(path.join(MEDIA, 'ep.mp4')).pipe(res);

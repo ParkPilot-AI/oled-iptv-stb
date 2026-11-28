@@ -88,7 +88,7 @@ export function Home() {
         tabs={<PillTabs tabs={TABS} active={tab} onChange={changeTab} group="home-tabs" className="home-tabs" onSelected={focusRows} />}
         empty={
           <p className="empty big">
-            {tab === 'continue' ? 'Nothing in progress yet — start a movie or episode and it will appear here.' : tab === 'favs' ? 'Press F on any channel, movie or series to add it to Favourites.' : 'Nothing here yet.'}
+            {tab === 'continue' ? 'Nothing in progress yet — start a movie or episode and it will appear here.' : tab === 'favs' ? 'Hold OK (or press F) on any channel, film or series to add it to Favourites.' : 'Nothing here yet.'}
           </p>
         }
       />

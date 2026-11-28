@@ -18,9 +18,12 @@ const cspPlugin = {
   },
 };
 
-export default defineConfig({
+// The demo backend (src/lib/mockApi.js) is only bundled for the dev server and
+// `vite build --mode demo`; the Electron build (plain `vite build`) leaves it out.
+export default defineConfig(({ command, mode }) => ({
   base: './',
   plugins: [react(), cspPlugin],
+  define: { __DEMO__: JSON.stringify(command === 'serve' || mode === 'demo') },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -28,4 +31,4 @@ export default defineConfig({
     sourcemap: false,
   },
   server: { port: 5173, strictPort: true },
-});
+}));

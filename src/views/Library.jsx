@@ -168,7 +168,7 @@ export function Library({ section }) {
           columns={COLS}
           rowHeight={25}
           overscan={1}
-          empty={<p className="empty big">{tab === '__fav' ? 'Press F on any title to add it here.' : 'Nothing here yet'}</p>}
+          empty={<p className="empty big">{tab === '__fav' ? 'Hold OK (or press F) on any title to add it here.' : 'Nothing here yet'}</p>}
           renderItem={(it, i) => (
             <PosterCard
               item={it}

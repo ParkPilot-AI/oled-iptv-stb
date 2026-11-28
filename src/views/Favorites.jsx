@@ -9,9 +9,9 @@ export function Favorites() {
   return (
     <div className="home">
       <header className="page-head">
-        <h1>Favorites</h1>
+        <h1>Favourites</h1>
       </header>
-      {!total && <p className="empty big">Press F on any channel, movie or series to add it here.</p>}
+      {!total && <p className="empty big">Hold OK (or press F) on any channel, film or series to add it here.</p>}
       <Carousel title="Channels" group="fav-live" count={favs.live.length}>
         {favs.live.map((c, i) => (
           <ChannelCard key={c.id} item={c} nowTitle={epg[c.epg]?.now?.title} onSelect={() => openItem(c, favs.live)} autoFocus={i === 0} />

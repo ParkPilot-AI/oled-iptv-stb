@@ -17,7 +17,7 @@ mesa vulkan-intel intel-media-driver libva-utils
 xorg-server xorg-xinit xorg-xset openbox picom
 
 # Playback + audio over HDMI
-mpv ffmpeg
+mpv ffmpeg yt-dlp
 pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber libpulse alsa-utils
 
 # Libraries the Electron app needs

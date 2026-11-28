@@ -1,5 +1,5 @@
 appId: tv.oled.iptvplayer
-productName: OLED IPTV
+productName: ONYX
 directories:
   output: release
 files:
@@ -25,6 +25,8 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
 linux:
+  # Installed boxes run /opt/oled-iptv/oled-iptv-player and the updater checks for it.
+  executableName: oled-iptv-player
   target: [AppImage, deb]
   category: AudioVideo
 # On Linux the system mpv is used unless one is placed in resources/mpv/linux.

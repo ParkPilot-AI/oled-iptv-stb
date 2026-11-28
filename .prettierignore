@@ -1,0 +1,6 @@
+dist
+release
+node_modules
+stb/out
+package-lock.json
+electron/data

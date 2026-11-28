@@ -1,3 +1,4 @@
+import { filterAdult, filterFavs } from './adult.js';
 import { applyTheme } from './theme.js';
 // Tiny global store (useSyncExternalStore) + catalog indexing, favorites,
 // progress and playback helpers.
@@ -15,6 +16,8 @@ let state = {
   epgVersion: 0,
   epgStatus: '',
   favorites: { live: [], movie: [], series: [] },
+  favoritesAll: { live: [], movie: [], series: [] },
+  catalogRaw: null,
   progress: {},
   section: 'home',
   detail: null, // {kind:'movie'|'series', item}
@@ -65,6 +68,22 @@ function indexSection(sec, sortFn) {
       return (recent ||= [...items].sort((a, b) => b.added - a.added).slice(0, 200));
     },
   };
+}
+
+/**
+ * The catalogue and favourites as the UI sees them. Everything visible (guide, chips,
+ * All channels, Search, Home rows, zapping lists) comes from here, so the adult filter
+ * applies everywhere. The unfiltered copies are kept for saving and for "Shown".
+ */
+function view(raw = state.catalogRaw, favs = state.favoritesAll, show = !!state.settings?.showAdult) {
+  const f = filterAdult(raw, show);
+  const all = { live: [], movie: [], series: [], ...(favs || {}) };
+  return { catalogRaw: raw, favoritesAll: all, catalog: raw ? indexCatalog(f.raw) : null, favorites: filterFavs(all, f.hidden, show) };
+}
+
+/** Re-apply the adult filter after the setting changes. */
+export function refreshView() {
+  if (state.catalogRaw) setState(view());
 }
 
 function indexCatalog(raw) {
@@ -119,8 +138,7 @@ export async function activateProfile(id, { force = false } = {}) {
     ]);
     setState({
       account,
-      catalog: indexCatalog(raw),
-      favorites: { live: [], movie: [], series: [], ...favorites },
+      ...view(raw, favorites),
       progress: progress || {},
       boot: 'ready',
       section: 'home',
@@ -137,8 +155,10 @@ export async function loadEpg(profileId, force = false) {
   try {
     const r = await api.invoke('epg:load', { profileId, force });
     setState((s) => ({ epgStatus: `${r.channels} channels with guide data`, epgVersion: s.epgVersion + 1 }));
+    return { ok: true };
   } catch (e) {
     setState({ epgStatus: `Guide unavailable: ${e.message}` });
+    return { ok: false, error: e.message };
   }
 }
 
@@ -153,7 +173,7 @@ api.on('catalog:progress', (p) => {
 });
 api.on('catalog:updated', ({ profileId, catalog, silent }) => {
   if (profileId === state.profileId) {
-    setState({ catalog: indexCatalog(catalog) });
+    setState(view(catalog));
     if (!silent) toast('Playlist updated');
   }
 });
@@ -161,18 +181,23 @@ api.on('catalog:updated', ({ profileId, catalog, silent }) => {
 /** Re-read the (cached) catalog, e.g. after changing the channel-logo setting. */
 export async function reloadCatalog() {
   const raw = await api.invoke('catalog:load', { profileId: state.profileId });
-  setState({ catalog: indexCatalog(raw) });
+  setState(view(raw));
 }
 api.on('epg:progress', (p) => p.mb && setState({ epgStatus: `Loading guide… ${p.mb} MB` }));
 api.on('epg:updated', () => setState((s) => ({ epgVersion: s.epgVersion + 1 })));
-api.on('player:closed', async () => {
+api.on('player:closed', async (summary) => {
+  // Back from a trailer: return to its page with focus on the Trailer button.
+  if (summary?.item?.kind === 'trailer') {
+    requestAnimationFrame(() => document.querySelector('.detail [data-trailer]')?.focus());
+    return;
+  }
   const pid = state.profileId;
   if (!pid) return;
   const [progress, favorites] = await Promise.all([
     api.invoke('doc:get', { profileId: pid, name: 'progress' }),
     api.invoke('doc:get', { profileId: pid, name: 'favorites' }),
   ]);
-  setState({ progress: progress || {}, favorites: { live: [], movie: [], series: [], ...favorites } });
+  setState({ progress: progress || {}, ...view(state.catalogRaw, favorites) });
 });
 
 // ---------- favorites ----------
@@ -182,12 +207,12 @@ export const isFavorite = (favs, item) => !!item && favs[favKind(item)]?.some((f
 export function toggleFavorite(item) {
   if (!item || !['live', 'movie', 'series'].includes(item.kind)) return;
   const k = favKind(item);
-  const favs = state.favorites;
+  const favs = state.favoritesAll;
   const on = isFavorite(favs, item);
   const next = { ...favs, [k]: on ? favs[k].filter((f) => f.id !== item.id) : [clean(item), ...favs[k]] };
-  setState({ favorites: next });
+  setState(view(state.catalogRaw, next));
   api.invoke('doc:set', { profileId: state.profileId, name: 'favorites', data: next });
-  toast(on ? `Removed “${item.name}” from Favorites` : `Added “${item.name}” to Favorites`);
+  toast(on ? `Removed “${item.name}” from Favourites` : `Added “${item.name}” to Favourites`);
 }
 
 /** Registry so the global F key can find the item behind the focused element. */
