@@ -141,6 +141,13 @@ provision() {
     fi
   fi
   install_system_files "$src"
+  # The GPU's render node (/dev/dri/renderD*) is group 'render' with no seat ACL on
+  # this box: without it apps fall back to slow software drawing (GeForce NOW shows
+  # "Could not get DRI3 device … llvmpipe"). Takes effect at the next login/reboot.
+  if [[ -z ${STB_ROOT:-} ]] && getent group render >/dev/null && id "$KIOSK_USER" >/dev/null 2>&1 &&
+    [[ " $(id -nG "$KIOSK_USER") " != *" render "* ]]; then
+    usermod -aG render "$KIOSK_USER" && say "STEP Gave $KIOSK_USER access to the graphics chip" && say "REBOOT_REQUIRED"
+  fi
   if ! systemctl is-enabled bluetooth.service >/dev/null 2>&1 || ! systemctl is-active bluetooth.service >/dev/null 2>&1; then
     say "STEP Starting Bluetooth"
     systemctl enable --now bluetooth.service >/dev/null 2>&1 || true

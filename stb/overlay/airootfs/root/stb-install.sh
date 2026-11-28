@@ -290,7 +290,8 @@ sed -i 's/^#en_GB.UTF-8/en_GB.UTF-8/; s/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.
 locale-gen >/dev/null
 echo 'LANG=en_GB.UTF-8' > /etc/locale.conf
 
-useradd -m -G wheel,video,audio,input -s /bin/bash tv
+# render: /dev/dri/renderD* (GPU for apps — GeForce NOW, hardware video decoding).
+useradd -m -G wheel,video,render,audio,input -s /bin/bash tv
 echo '%wheel ALL=(ALL:ALL) ALL' > /etc/sudoers.d/10-wheel
 chmod 440 /etc/sudoers.d/10-wheel
 
